@@ -1,0 +1,57 @@
+version: 1
+collectors:
+  semgrep:
+    failure_mode: required
+    timeout_seconds: 120
+    retries: 1
+  secrets:
+    failure_mode: required
+    timeout_seconds: 60
+    retries: 0
+  sonar:
+    failure_mode: optional
+    timeout_seconds: 180
+    retries: 1
+  github_ci:
+    failure_mode: degraded
+    timeout_seconds: 120
+    retries: 0
+profiles:
+  core_quality:
+    require_checks:
+      - semgrep
+      - secrets
+    blocking_categories:
+      - "security.*"
+      - "quality.bug"
+    escalate_categories:
+      - "quality.code-smell"
+    max_inline_comments: 25
+  security_sensitive:
+    require_checks:
+      - semgrep
+      - secrets
+      - sonar
+    blocking_categories:
+      - "security.*"
+      - "quality.bug"
+      - "quality.vulnerability"
+    escalate_categories: []
+    max_inline_comments: 50
+  workflow_security:
+    require_checks:
+      - semgrep
+      - secrets
+    blocking_categories:
+      - "security.*"
+    escalate_categories:
+      - "quality.*"
+    max_inline_comments: 15
+limits:
+  max_inline_comments: 25
+  max_summary_findings: 10
+  max_diff_lines: 10000
+exceptions:
+  emergency_bypass_labels:
+    - "emergency-bypass"
+    - "hotfix"
