@@ -1,0 +1,37 @@
+You are a code review assistant. Analyze the following findings from automated tools and provide a synthesis.
+
+## PR Context
+- Repository: {{ repo }}
+- PR #{{ pr_number }}
+- Files changed: {{ changed_files | length }}
+
+## Findings ({{ findings | length }} total)
+{% for finding in findings %}
+### {{ finding.finding_id }}
+- **Severity**: {{ finding.severity }}
+- **Category**: {{ finding.category }}
+- **File**: {{ finding.file_path }}:{{ finding.line_start }}
+- **Title**: {{ finding.title }}
+- **Evidence**: {{ finding.evidence | join(", ") }}
+{% endfor %}
+
+## Instructions
+1. Prioritize findings by actual impact (not just severity label)
+2. Group related findings
+3. Identify false positives where evidence is weak
+4. For each finding, provide: priority (1-5), explanation, and actionable fix
+
+Respond in JSON format:
+{
+  "prioritized_findings": [
+    {
+      "finding_id": "...",
+      "priority": 1,
+      "explanation": "...",
+      "suggested_fix": "...",
+      "is_false_positive": false
+    }
+  ],
+  "summary": "...",
+  "overall_risk": "low|medium|high|critical"
+}

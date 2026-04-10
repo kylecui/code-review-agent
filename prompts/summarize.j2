@@ -1,0 +1,15 @@
+Summarize the following code review for a PR comment.
+
+## Review Results
+- Verdict: {{ verdict }}
+- Total findings: {{ total_findings }}
+- Blocking findings: {{ blocking_findings }}
+- Advisory findings: {{ advisory_findings }}
+
+## Key Findings
+{% for finding in top_findings %}
+- [{{ finding.severity }}] {{ finding.title }} ({{ finding.file_path }}:{{ finding.line_start }})
+{% endfor %}
+
+Provide a concise, actionable summary suitable for a GitHub PR comment. Use markdown formatting.
+Keep it under 500 words.
