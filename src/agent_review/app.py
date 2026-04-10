@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from agent_review.config import Settings
 from agent_review.database import create_engine, create_session_factory
+from agent_review.observability import configure_logging
 
 
 @asynccontextmanager
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app(settings: Settings | None = None) -> FastAPI:
     if settings is None:
         settings = Settings()
+    configure_logging(settings.log_level, settings.log_format)
 
     app = FastAPI(title="Agent Review", lifespan=lifespan)
     app.state.settings = settings

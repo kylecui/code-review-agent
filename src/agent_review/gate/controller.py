@@ -120,6 +120,8 @@ class GateController:
 
         for collector_name, config in policy.collectors.items():
             result = result_by_name.get(collector_name)
+            if result is None:
+                continue
             is_success = result is not None and result.status == "success"
 
             if is_success:

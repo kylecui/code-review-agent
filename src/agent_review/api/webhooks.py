@@ -3,11 +3,13 @@ import hmac
 import json
 import uuid
 
+import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from sqlalchemy import select
 
 from agent_review.models import ReviewRun, ReviewState
 from agent_review.models.enums import TriggerEvent
+from agent_review.pipeline import PipelineRunner
 from agent_review.pipeline.supersession import supersede_active_runs
 
 router = APIRouter(tags=["webhooks"])
@@ -31,8 +33,22 @@ TRIGGER_ACTIONS: dict[str, TriggerEvent] = {
 }
 
 
+async def _run_pipeline(request: Request, run_id: str) -> None:
+    settings = request.app.state.settings
+    if settings.github_app_id <= 0 or not settings.github_private_key.get_secret_value().strip():
+        return
+
+    async with httpx.AsyncClient(timeout=30.0) as http_client:
+        runner = PipelineRunner(
+            settings=settings,
+            session_factory=request.app.state.session_factory,
+            http_client=http_client,
+        )
+        await runner.run(run_id)
+
+
 @router.post("/github")
-async def github_webhook(request: Request, _background_tasks: BackgroundTasks) -> dict[str, str]:
+async def github_webhook(request: Request, background_tasks: BackgroundTasks) -> dict[str, str]:
     raw_body = await request.body()
 
     settings = request.app.state.settings
@@ -76,7 +92,7 @@ async def github_webhook(request: Request, _background_tasks: BackgroundTasks) -
                 ReviewRun.repo == repo,
                 ReviewRun.pr_number == pr_number,
                 ReviewRun.head_sha == head_sha,
-                ReviewRun.state.notin_([ReviewState.FAILED, ReviewState.SUPERSEDED]),
+                ReviewRun.state != ReviewState.SUPERSEDED,
             )
         )
         if existing_run.scalar_one_or_none():
@@ -98,5 +114,6 @@ async def github_webhook(request: Request, _background_tasks: BackgroundTasks) -
         await db.commit()
         await db.refresh(run)
         run_id = str(run.id)
+        background_tasks.add_task(_run_pipeline, request, run_id)
 
     return {"status": "queued", "run_id": run_id}
