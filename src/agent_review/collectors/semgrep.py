@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from agent_review.collectors.base import AbstractCollector, CollectorContext, CollectorResult
 from agent_review.observability import get_logger
@@ -82,8 +82,9 @@ class SemgrepCollector(AbstractCollector):
             stdout_text = stdout_bytes.decode("utf-8", errors="replace")
             stderr_text = stderr_bytes.decode("utf-8", errors="replace")
 
-            # semgrep exits with 0=no findings, 1=findings found, other=error
-            if proc.returncode not in (0, 1):
+            # semgrep exit codes: 0=no findings, 1=findings, 7=findings+errors (partial)
+            # Treat 7 as partial success — parse whatever results are in stdout
+            if proc.returncode not in (0, 1, 7):
                 logger.warning(
                     "semgrep_cli_error",
                     returncode=proc.returncode,
@@ -98,11 +99,20 @@ class SemgrepCollector(AbstractCollector):
                     metadata={"mode": "cli"},
                 )
 
+            if proc.returncode == 7:
+                logger.warning(
+                    "semgrep_cli_partial",
+                    returncode=proc.returncode,
+                    stderr=stderr_text[:2000],
+                )
+
             raw_findings = self._parse_cli_output(stdout_text)
+            is_partial = proc.returncode == 7
             logger.info(
                 "semgrep_cli_done",
                 finding_count=len(raw_findings),
                 duration_ms=self._duration_ms(started),
+                partial=is_partial,
             )
 
             return CollectorResult(
@@ -110,7 +120,11 @@ class SemgrepCollector(AbstractCollector):
                 status="success",
                 raw_findings=raw_findings,
                 duration_ms=self._duration_ms(started),
-                metadata={"mode": "cli", "rules_path": rules_path},
+                metadata={
+                    "mode": "cli",
+                    "rules_path": rules_path,
+                    "partial": is_partial,
+                },
             )
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
@@ -152,6 +166,61 @@ class SemgrepCollector(AbstractCollector):
             return dirs[0]
         return Path(tmpdir)
 
+    EXTENSION_TO_RULE_DIRS: ClassVar[dict[str, list[str]]] = {
+        ".java": ["java"],
+        ".jsp": ["java"],
+        ".js": ["javascript"],
+        ".jsx": ["javascript"],
+        ".ts": ["typescript", "javascript"],
+        ".tsx": ["typescript", "javascript"],
+        ".py": ["python"],
+        ".go": ["go"],
+        ".rb": ["ruby"],
+        ".php": ["php"],
+        ".c": ["c"],
+        ".h": ["c"],
+        ".cpp": ["c"],
+        ".cs": ["csharp"],
+        ".rs": ["rust"],
+        ".swift": ["swift"],
+        ".kt": ["kotlin"],
+        ".kts": ["kotlin"],
+        ".scala": ["scala"],
+        ".clj": ["clojure"],
+        ".ex": ["elixir"],
+        ".exs": ["elixir"],
+        ".ml": ["ocaml"],
+        ".sol": ["solidity"],
+        ".sh": ["bash"],
+        ".bash": ["bash"],
+        ".tf": ["terraform"],
+        ".hcl": ["terraform"],
+        ".html": ["html"],
+        ".htm": ["html"],
+        ".yaml": ["yaml"],
+        ".yml": ["yaml"],
+        ".json": ["json"],
+        ".dockerfile": ["dockerfile"],
+    }
+    ALWAYS_INCLUDE_DIRS: ClassVar[list[str]] = ["generic"]
+
+    @classmethod
+    def _detect_rule_dirs(cls, scan_dir: Path, rules_path: str) -> list[str]:
+        available = {p.name for p in Path(rules_path).iterdir() if p.is_dir()}
+        detected: set[str] = set()
+        for path in scan_dir.rglob("*"):
+            if path.is_file():
+                suffix = path.suffix.lower()
+                for rule_dir in cls.EXTENSION_TO_RULE_DIRS.get(suffix, []):
+                    detected.add(rule_dir)
+                if path.name.lower() in ("dockerfile", "containerfile"):
+                    detected.add("dockerfile")
+            if len(detected) >= 10:
+                break
+
+        detected.update(cls.ALWAYS_INCLUDE_DIRS)
+        return sorted(detected & available)
+
     def _build_command(
         self,
         rules_path: str,
@@ -162,21 +231,35 @@ class SemgrepCollector(AbstractCollector):
         cmd = [
             "semgrep",
             "scan",
-            "--config",
-            rules_path,
-            "--json",
-            "--quiet",
-            "-j",
-            "2",
-            "--timeout",
-            "30" if is_baseline else "10",
-            "--timeout-threshold",
-            "3",
-            "--max-target-bytes",
-            "1000000",
-            "--max-memory",
-            "2000",
         ]
+
+        if is_baseline:
+            lang_dirs = self._detect_rule_dirs(scan_dir, rules_path)
+            if lang_dirs:
+                for lang_dir in lang_dirs:
+                    cmd.extend(["--config", str(Path(rules_path) / lang_dir)])
+                logger.info("semgrep_scoped_rules", lang_dirs=lang_dirs)
+            else:
+                cmd.extend(["--config", rules_path])
+        else:
+            cmd.extend(["--config", rules_path])
+
+        cmd.extend(
+            [
+                "--json",
+                "--quiet",
+                "-j",
+                "2",
+                "--timeout",
+                "30" if is_baseline else "10",
+                "--timeout-threshold",
+                "3",
+                "--max-target-bytes",
+                "1000000",
+                "--max-memory",
+                "2000",
+            ]
+        )
 
         valid_semgrep_severities = {"INFO", "WARNING", "ERROR"}
         for sev in self._settings.semgrep_severity_filter:

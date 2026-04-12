@@ -246,3 +246,114 @@ def test_find_repo_root_single_dir(tmp_path: Path) -> None:
 def test_find_repo_root_fallback(tmp_path: Path) -> None:
     result = SemgrepCollector._find_repo_root(str(tmp_path))
     assert result == tmp_path
+
+
+def test_detect_rule_dirs_java_project(tmp_path: Path) -> None:
+    rules_dir = tmp_path / "rules"
+    for d in ("java", "javascript", "python", "generic", "go"):
+        (rules_dir / d).mkdir(parents=True)
+
+    scan_dir = tmp_path / "repo"
+    scan_dir.mkdir()
+    (scan_dir / "src").mkdir()
+    (scan_dir / "src" / "Main.java").write_text("class Main {}")
+    (scan_dir / "pom.xml").write_text("<project/>")
+    (scan_dir / "src" / "index.jsp").write_text("<html/>")
+
+    detected = SemgrepCollector._detect_rule_dirs(scan_dir, str(rules_dir))
+    assert "java" in detected
+    assert "generic" in detected
+    assert "python" not in detected
+    assert "go" not in detected
+
+
+def test_detect_rule_dirs_mixed_project(tmp_path: Path) -> None:
+    rules_dir = tmp_path / "rules"
+    for d in ("java", "javascript", "typescript", "python", "generic", "html"):
+        (rules_dir / d).mkdir(parents=True)
+
+    scan_dir = tmp_path / "repo"
+    scan_dir.mkdir()
+    (scan_dir / "app.ts").write_text("const x = 1;")
+    (scan_dir / "index.html").write_text("<html/>")
+    (scan_dir / "server.py").write_text("print('hi')")
+
+    detected = SemgrepCollector._detect_rule_dirs(scan_dir, str(rules_dir))
+    assert "typescript" in detected
+    assert "javascript" in detected
+    assert "python" in detected
+    assert "html" in detected
+    assert "generic" in detected
+    assert "java" not in detected
+
+
+def test_detect_rule_dirs_empty_repo(tmp_path: Path) -> None:
+    rules_dir = tmp_path / "rules"
+    (rules_dir / "generic").mkdir(parents=True)
+    (rules_dir / "java").mkdir()
+
+    scan_dir = tmp_path / "repo"
+    scan_dir.mkdir()
+
+    detected = SemgrepCollector._detect_rule_dirs(scan_dir, str(rules_dir))
+    assert detected == ["generic"]
+
+
+def test_detect_rule_dirs_dockerfile(tmp_path: Path) -> None:
+    rules_dir = tmp_path / "rules"
+    (rules_dir / "dockerfile").mkdir(parents=True)
+    (rules_dir / "generic").mkdir()
+
+    scan_dir = tmp_path / "repo"
+    scan_dir.mkdir()
+    (scan_dir / "Dockerfile").write_text("FROM python:3.12")
+
+    detected = SemgrepCollector._detect_rule_dirs(scan_dir, str(rules_dir))
+    assert "dockerfile" in detected
+
+
+def test_build_command_baseline_uses_scoped_rules(tmp_path: Path) -> None:
+    rules_dir = tmp_path / "rules"
+    for d in ("java", "generic", "python"):
+        (rules_dir / d).mkdir(parents=True)
+
+    scan_dir = tmp_path / "repo"
+    scan_dir.mkdir()
+    (scan_dir / "Main.java").write_text("class Main {}")
+
+    settings = Settings.model_validate(
+        {
+            "semgrep_mode": "cli",
+            "semgrep_rules_path": str(rules_dir),
+            "semgrep_severity_filter": ["ERROR", "WARNING"],
+        }
+    )
+    collector = SemgrepCollector(settings=settings, http_client=cast("httpx.AsyncClient", None))
+    cmd = collector._build_command(str(rules_dir), [], scan_dir, is_baseline=True)
+
+    config_indices = [i for i, v in enumerate(cmd) if v == "--config"]
+    config_values = [cmd[i + 1] for i in config_indices]
+    assert str(rules_dir / "generic") in config_values
+    assert str(rules_dir / "java") in config_values
+    assert str(rules_dir / "python") not in config_values
+
+
+def test_build_command_non_baseline_uses_full_rules(tmp_path: Path) -> None:
+    rules_dir = tmp_path / "rules"
+    (rules_dir / "java").mkdir(parents=True)
+    (rules_dir / "generic").mkdir()
+
+    settings = Settings.model_validate(
+        {
+            "semgrep_mode": "cli",
+            "semgrep_rules_path": str(rules_dir),
+            "semgrep_severity_filter": ["ERROR"],
+        }
+    )
+    collector = SemgrepCollector(settings=settings, http_client=cast("httpx.AsyncClient", None))
+    cmd = collector._build_command(str(rules_dir), [], tmp_path, is_baseline=False)
+
+    config_indices = [i for i, v in enumerate(cmd) if v == "--config"]
+    config_values = [cmd[i + 1] for i in config_indices]
+    assert len(config_values) == 1
+    assert config_values[0] == str(rules_dir)
