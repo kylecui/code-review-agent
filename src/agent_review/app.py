@@ -1,8 +1,10 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from agent_review.config import Settings
@@ -48,7 +50,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from agent_review.api.health import router as health_router
     from agent_review.api.scan import router as scan_router
     from agent_review.api.webhooks import router as webhooks_router
-    from agent_review.web.routes import router as web_router
 
     app.include_router(health_router)
     app.include_router(scan_router, prefix="/api")
@@ -58,5 +59,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(admin_policies_router, prefix="/api/admin/policies")
     app.include_router(admin_scans_router, prefix="/api/admin/scans")
     app.include_router(webhooks_router, prefix="/webhooks")
-    app.include_router(web_router)
+
+    frontend_dir = settings.frontend_dir
+    if frontend_dir.exists() and frontend_dir.is_dir():
+        app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static-assets")
+        index_html = frontend_dir / "index.html"
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa_catchall(request: Request, full_path: str) -> FileResponse:
+            file_path = frontend_dir / full_path
+            if full_path and file_path.exists() and file_path.is_file():
+                return FileResponse(file_path)
+            return FileResponse(str(index_html))
+
     return app

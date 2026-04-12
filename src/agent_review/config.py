@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     policy_dir: Path = Path("./policies")
     prompts_dir: Path = Path("./prompts")
+    frontend_dir: Path = Path("./static")
 
     cors_origins: list[str] = []
 
