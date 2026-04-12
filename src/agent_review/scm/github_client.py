@@ -197,3 +197,22 @@ class GitHubClient:
     async def get_pr_files(self, repo: str, pr_number: int) -> list[dict[str, Any]]:
         response = await self._request("GET", f"/repos/{repo}/pulls/{pr_number}/files")
         return cast("list[dict[str, Any]]", response.json())
+
+    async def get_branch_sha(self, repo: str, branch: str) -> str:
+        response = await self._request("GET", f"/repos/{repo}/branches/{branch}")
+        data = response.json()
+        return cast("str", data["commit"]["sha"])
+
+    async def get_default_branch(self, repo: str) -> str:
+        response = await self._request("GET", f"/repos/{repo}")
+        data = response.json()
+        return cast("str", data["default_branch"])
+
+    async def create_issue(
+        self, repo: str, title: str, body: str, labels: list[str] | None = None
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"title": title, "body": body}
+        if labels:
+            payload["labels"] = labels
+        response = await self._request("POST", f"/repos/{repo}/issues", json=payload)
+        return cast("dict[str, Any]", response.json())

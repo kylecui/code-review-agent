@@ -10,11 +10,12 @@ CollectorStatus = Literal["success", "failure", "timeout", "skipped"]
 @dataclass(slots=True)
 class CollectorContext:
     repo: str
-    pr_number: int
     head_sha: str
-    base_sha: str
     changed_files: list[str]
     github_client: GitHubClient
+    run_kind: str = "pr"
+    pr_number: int | None = None
+    base_sha: str | None = None
 
 
 @dataclass(slots=True)

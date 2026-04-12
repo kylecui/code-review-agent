@@ -5,6 +5,7 @@ from .enums import (
     FindingDisposition,
     FindingSeverity,
     ReviewState,
+    RunKind,
     TriggerEvent,
     Verdict,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "InvalidTransition",
     "ReviewRun",
     "ReviewState",
+    "RunKind",
     "TriggerEvent",
     "Verdict",
 ]

@@ -2,7 +2,7 @@ import datetime as dt
 import uuid
 from typing import Any
 
-from agent_review.models import Finding, ReviewRun, ReviewState, TriggerEvent
+from agent_review.models import Finding, ReviewRun, ReviewState, RunKind, TriggerEvent
 from agent_review.models.enums import FindingConfidence, FindingDisposition, FindingSeverity
 
 
@@ -10,6 +10,7 @@ def build_review_run(**overrides: Any) -> ReviewRun:
     defaults: dict[str, Any] = {
         "id": uuid.uuid4(),
         "repo": "owner/repo",
+        "run_kind": RunKind.PR,
         "pr_number": 1,
         "head_sha": "a" * 40,
         "base_sha": "b" * 40,

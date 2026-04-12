@@ -27,8 +27,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
 
     from agent_review.api.health import router as health_router
+    from agent_review.api.scan import router as scan_router
     from agent_review.api.webhooks import router as webhooks_router
 
     app.include_router(health_router)
+    app.include_router(scan_router, prefix="/api")
     app.include_router(webhooks_router, prefix="/webhooks")
     return app

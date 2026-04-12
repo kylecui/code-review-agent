@@ -9,7 +9,12 @@ from agent_review.schemas.policy import (
     PolicyConfig,
     ProfilePolicyConfig,
 )
-from agent_review.schemas.review_run import ReviewRunCreate, ReviewRunRead, ReviewRunUpdate
+from agent_review.schemas.review_run import (
+    ReviewRunCreate,
+    ReviewRunRead,
+    ReviewRunUpdate,
+    ScanRequest,
+)
 from agent_review.schemas.webhook import (
     GitHubWebhookPayload,
     InstallationInfo,
@@ -39,6 +44,7 @@ __all__ = [
     "ReviewRunCreate",
     "ReviewRunRead",
     "ReviewRunUpdate",
+    "ScanRequest",
     "SenderInfo",
     "WebhookHeaders",
 ]

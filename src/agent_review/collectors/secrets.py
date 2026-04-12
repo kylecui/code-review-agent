@@ -28,7 +28,10 @@ class SecretsCollector(AbstractCollector):
             for alert in payload:
                 if not isinstance(alert, dict):
                     continue
-                if self._is_relevant(alert, context.head_sha, context.base_sha):
+                if context.run_kind == "baseline":
+                    if not str(alert.get("resolved_at", "")):
+                        findings.append(self._parse_alert(alert))
+                elif self._is_relevant(alert, context.head_sha, context.base_sha):
                     findings.append(self._parse_alert(alert))
 
             return CollectorResult(

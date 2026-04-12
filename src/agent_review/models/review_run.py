@@ -8,7 +8,7 @@ from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String,
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ._base import Base
-from .enums import ReviewState, TriggerEvent
+from .enums import ReviewState, RunKind, TriggerEvent
 
 _UUID_TYPE = uuid.UUID
 _DATETIME_TYPE = dt.datetime
@@ -58,9 +58,14 @@ class ReviewRun(Base):
         server_default=text("gen_random_uuid()"),
     )
     repo: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    pr_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    run_kind: Mapped[RunKind] = mapped_column(
+        Enum(RunKind),
+        nullable=False,
+        default=RunKind.PR,
+    )
+    pr_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     head_sha: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
-    base_sha: Mapped[str] = mapped_column(String(40), nullable=False)
+    base_sha: Mapped[str | None] = mapped_column(String(40), nullable=True)
     installation_id: Mapped[int] = mapped_column(Integer, nullable=False)
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     state: Mapped[ReviewState] = mapped_column(
@@ -74,8 +79,8 @@ class ReviewRun(Base):
         ForeignKey("review_runs.id"),
         nullable=True,
     )
-    trigger_event: Mapped[TriggerEvent] = mapped_column(Enum(TriggerEvent), nullable=False)
-    delivery_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    trigger_event: Mapped[TriggerEvent | None] = mapped_column(Enum(TriggerEvent), nullable=True)
+    delivery_id: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
     classification: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     decision: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     metrics: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)

@@ -5,10 +5,11 @@ from pydantic import BaseModel, Field
 
 class CollectorContext(BaseModel):
     repo: str
-    pr_number: int
     head_sha: str
-    base_sha: str
     changed_files: list[str]
+    run_kind: str = "pr"
+    pr_number: int | None = None
+    base_sha: str | None = None
 
 
 class CollectorResult(BaseModel):

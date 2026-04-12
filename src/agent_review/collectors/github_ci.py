@@ -10,6 +10,15 @@ class GitHubCICollector(AbstractCollector):
     async def collect(self, context: CollectorContext) -> CollectorResult:
         started = time.perf_counter()
         try:
+            if context.run_kind == "baseline":
+                return CollectorResult(
+                    collector_name=self.name,
+                    status="skipped",
+                    raw_findings=[],
+                    duration_ms=self._duration_ms(started),
+                    error="CI collector requires a pull request",
+                )
+
             checks_payload = await context.github_client._request(
                 "GET",
                 f"/repos/{context.repo}/commits/{context.head_sha}/check-runs",

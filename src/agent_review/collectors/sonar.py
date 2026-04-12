@@ -17,6 +17,15 @@ class SonarCollector(AbstractCollector):
     async def collect(self, context: CollectorContext) -> CollectorResult:
         started = time.perf_counter()
         try:
+            if context.run_kind == "baseline":
+                return CollectorResult(
+                    collector_name=self.name,
+                    status="skipped",
+                    raw_findings=[],
+                    duration_ms=self._duration_ms(started),
+                    error="Sonar collector requires a pull request",
+                )
+
             host = self._settings.sonar_host_url
             token = self._settings.sonar_token
             if host is None or token is None or not token.get_secret_value():

@@ -50,6 +50,11 @@ class FindingConfidence(str, _Enum):
     LOW = "low"
 
 
+class RunKind(str, _Enum):
+    PR = "pr"
+    BASELINE = "baseline"
+
+
 class FindingDisposition(str, _Enum):
     NEW = "new"
     EXISTING = "existing"
