@@ -480,6 +480,60 @@ make serve      # Dev server on port 8000 with hot reload
 make migrate    # Alembic database migrations
 ```
 
+## Admin Dashboard
+
+### First-Time Setup
+
+After deployment, navigate to your instance URL. The login page appears. Register the first account — it is automatically promoted to admin (superuser).
+
+### GitHub OAuth Configuration
+
+To enable "Sign in with GitHub":
+
+1. Go to your GitHub App settings > General
+2. Under "Identifying and authorizing users", set:
+   - **Callback URL**: `https://your-server.example.com/api/auth/github/callback`
+3. Copy the Client ID and generate a Client Secret
+4. Set in `.env`:
+   ```
+   AGENT_REVIEW_GITHUB_OAUTH_CLIENT_ID=your_client_id
+   AGENT_REVIEW_GITHUB_OAUTH_CLIENT_SECRET=your_client_secret
+   AGENT_REVIEW_OAUTH_REDIRECT_URI=https://your-server.example.com/api/auth/github/callback
+   ```
+5. Restart the application
+
+### Scan Dashboard
+
+- Navigate to **Scans** in the sidebar
+- View all scan runs with filters for repository, state, and scan type
+- Click any scan to see detailed findings grouped by blocking vs advisory
+- Admins can trigger new baseline scans, cancel running scans, and delete completed scans
+
+### Settings Management
+
+- Navigate to **Settings** in the sidebar (admin only)
+- Settings are grouped into: LLM Configuration, Collectors, Limits, Observability
+- Edit any value and click Save to persist to the database
+- Click "Reset" on any setting to revert to the environment default
+- Changes take effect for new scans only; in-flight scans use their original settings
+
+### Policy Editor
+
+- Navigate to **Policies** in the sidebar (admin only)
+- View all stored policies; click to edit in the Monaco YAML editor
+- Create per-repository policy overrides (e.g., `owner/repo`)
+- The editor validates YAML syntax and PolicyConfig schema on save
+- ETag-based conflict detection prevents overwriting concurrent edits
+- Use "Seed from Disk" to import policies from the `policies/` directory
+
+### User Management
+
+- Navigate to **Users** in the sidebar (admin only)
+- View all users with their roles, status, and GitHub link
+- Create new users with email/password and admin/viewer role
+- Toggle user active status or superuser role
+- Self-protection: you cannot remove your own admin role or deactivate yourself
+
 ---
 
 # 简体中文
@@ -959,3 +1013,57 @@ make check      # 以上全部
 make serve      # 开发服务器，端口 8000，热重载
 make migrate    # Alembic 数据库迁移
 ```
+
+## 管理仪表盘
+
+### 首次设置
+
+部署完成后，访问实例 URL。登录页面会出现。注册第一个账号 — 自动升级为管理员（超级用户）。
+
+### GitHub OAuth 配置
+
+启用"使用 GitHub 登录"：
+
+1. 前往 GitHub App 设置 > 通用
+2. 在"识别和授权用户"下，设置：
+   - **回调 URL**：`https://your-server.example.com/api/auth/github/callback`
+3. 复制 Client ID 并生成 Client Secret
+4. 在 `.env` 中设置：
+   ```
+   AGENT_REVIEW_GITHUB_OAUTH_CLIENT_ID=your_client_id
+   AGENT_REVIEW_GITHUB_OAUTH_CLIENT_SECRET=your_client_secret
+   AGENT_REVIEW_OAUTH_REDIRECT_URI=https://your-server.example.com/api/auth/github/callback
+   ```
+5. 重启应用
+
+### 扫描仪表盘
+
+- 点击侧栏中的**扫描**
+- 查看所有扫描记录，支持按仓库、状态和扫描类型筛选
+- 点击任意扫描查看详细发现，按阻断/建议分类分组
+- 管理员可以触发新基线扫描、取消运行中的扫描、删除已完成的扫描
+
+### 设置管理
+
+- 点击侧栏中的**设置**（仅管理员）
+- 设置分为：LLM 配置、收集器、限制、可观测性
+- 编辑任意值并点击保存以持久化到数据库
+- 点击"重置"可将设置恢复为环境变量默认值
+- 更改仅对新扫描生效；进行中的扫描使用原始设置
+
+### 策略编辑器
+
+- 点击侧栏中的**策略**（仅管理员）
+- 查看所有存储的策略；点击在 Monaco YAML 编辑器中编辑
+- 创建按仓库覆盖的策略（如 `owner/repo`）
+- 编辑器在保存时验证 YAML 语法和 PolicyConfig 模式
+- 基于 ETag 的冲突检测防止覆盖并发编辑
+- 使用"从磁盘导入"将 `policies/` 目录中的策略导入数据库
+
+### 用户管理
+
+- 点击侧栏中的**用户**（仅管理员）
+- 查看所有用户的角色、状态和 GitHub 关联
+- 创建新用户，设置邮箱/密码和管理员/查看者角色
+- 切换用户活跃状态或超级用户角色
+- 自我保护：不能移除自己的管理员角色或停用自己

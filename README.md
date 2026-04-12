@@ -93,6 +93,31 @@ Navigate to `/ui/scans` on your deployed instance. The dashboard shows all scan 
 
 <!-- TODO: Add screenshot -->
 
+## Admin Dashboard
+
+Agent Review includes a built-in admin dashboard for managing all aspects of the system.
+
+### Features
+
+- **Authentication**: Email/password login and GitHub OAuth
+- **User Management**: Create, edit, activate/deactivate users with admin/viewer roles
+- **Scan Management**: Browse scans with pagination and filters, view detailed findings, trigger new scans
+- **Settings Management**: Modify LLM, collector, and limit settings at runtime without restarting
+- **Policy Editor**: Edit YAML gate policies with syntax highlighting and validation, ETag conflict detection
+
+### First-Time Setup
+
+1. Navigate to your instance (e.g., `https://your-server.example.com`)
+2. Register the first account — it automatically becomes the admin
+3. Configure GitHub OAuth (optional) in `.env` for team access
+
+### Access Control
+
+| Role | Scans | Settings | Policies | Users |
+|------|-------|----------|----------|-------|
+| Admin (superuser) | View, Trigger, Cancel, Delete | View, Edit, Reset | View, Edit, Create, Delete | View, Create, Edit, Deactivate |
+| Viewer | View only | — | — | — |
+
 ## Project Structure
 
 ```
@@ -103,8 +128,9 @@ src/agent_review/
   models/             # ORM models (ReviewRun, Finding)
   schemas/            # Pydantic schemas
   api/                # API routers: health, scan, webhooks
-  web/                # Web UI routes (Jinja2 SSR)
-  templates/          # HTML templates
+  api/admin/          # Admin API routers (users, settings, policies, scans)
+  auth/               # Authentication (JWT, OAuth, password hashing)
+  frontend/           # React SPA (Vite + shadcn/ui)
   reporting/          # Output: JSON, Markdown, GitHub Issue
   scm/                # GitHub App auth, REST client
   classifier/         # File-pattern heuristic classifier
@@ -235,6 +261,31 @@ python -m agent_review scan-local \
 
 <!-- TODO: 添加截图 -->
 
+## 管理仪表盘
+
+Agent Review 内置管理仪表盘，用于管理系统的所有方面。
+
+### 功能
+
+- **身份认证**：邮箱/密码登录和 GitHub OAuth
+- **用户管理**：创建、编辑、启用/停用用户，支持管理员/查看者角色
+- **扫描管理**：分页浏览扫描记录，查看详细发现，触发新扫描
+- **设置管理**：运行时修改 LLM、收集器和限制设置，无需重启
+- **策略编辑器**：编辑 YAML 策略，支持语法高亮、验证和冲突检测
+
+### 首次设置
+
+1. 访问实例地址（如 `https://your-server.example.com`）
+2. 注册第一个账号 — 自动成为管理员
+3. 在 `.env` 中配置 GitHub OAuth（可选），方便团队访问
+
+### 访问控制
+
+| 角色 | 扫描 | 设置 | 策略 | 用户 |
+|------|------|------|------|------|
+| 管理员 | 查看、触发、取消、删除 | 查看、编辑、重置 | 查看、编辑、创建、删除 | 查看、创建、编辑、停用 |
+| 查看者 | 仅查看 | — | — | — |
+
 ## 项目结构
 
 ```
@@ -245,8 +296,9 @@ src/agent_review/
   models/             # ORM 模型（ReviewRun、Finding）
   schemas/            # Pydantic 数据模式
   api/                # API 路由：健康检查、扫描、Webhook
-  web/                # Web UI 路由（Jinja2 SSR）
-  templates/          # HTML 模板
+  api/admin/          # Admin API 路由（用户、设置、策略、扫描）
+  auth/               # 身份认证（JWT、OAuth、密码哈希）
+  frontend/           # React SPA (Vite + shadcn/ui)
   reporting/          # 输出格式：JSON、Markdown、GitHub Issue
   scm/                # GitHub App 认证和 REST 客户端
   classifier/         # 文件模式启发式分类器

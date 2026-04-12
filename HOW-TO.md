@@ -425,6 +425,40 @@ make serve      # Start uvicorn dev server on port 8000 with hot reload
 make migrate    # Run Alembic database migrations (upgrade head)
 ```
 
+## Admin Dashboard
+
+### Access the Dashboard
+
+After deployment, open your browser and navigate to `https://your-server.example.com`. If no users exist, register the first account — it automatically becomes the admin.
+
+### Manage Users
+
+1. Log in as admin
+2. Go to **Users** in the sidebar
+3. Click **Create User** to add team members
+4. Set role: Admin (full access) or Viewer (scan viewing only)
+
+### Change Runtime Settings
+
+1. Go to **Settings** in the sidebar
+2. Modify any operational setting (LLM model, token limits, collector mode, etc.)
+3. Click **Save** — changes apply to new scans immediately
+4. To revert: click **Reset** next to any setting
+
+### Edit Gate Policies
+
+1. Go to **Policies** in the sidebar
+2. Click a policy name to open the YAML editor
+3. Edit the policy and click **Save**
+4. To create a per-repo override: click **Create Policy** and enter the repo name (e.g., `owner/repo`)
+
+### Trigger a Baseline Scan from the Dashboard
+
+1. Go to **Scans** in the sidebar
+2. Click **Trigger Scan**
+3. Enter the repository name and installation ID
+4. The scan appears in the list with "pending" status
+
 ## Troubleshooting
 
 **Webhook not received**
