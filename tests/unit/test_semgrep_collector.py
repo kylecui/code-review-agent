@@ -206,7 +206,7 @@ def test_build_command_with_severity_filter() -> None:
         {
             "semgrep_mode": "cli",
             "semgrep_rules_path": "/opt/semgrep-rules",
-            "semgrep_severity_filter": ["CRITICAL", "ERROR"],
+            "semgrep_severity_filter": ["CRITICAL", "ERROR", "WARNING"],
         }
     )
     collector = SemgrepCollector(settings=settings, http_client=cast("httpx.AsyncClient", None))
@@ -214,8 +214,9 @@ def test_build_command_with_severity_filter() -> None:
     assert "--severity" in cmd
     sev_indices = [i for i, v in enumerate(cmd) if v == "--severity"]
     severities = [cmd[i + 1] for i in sev_indices]
-    assert "CRITICAL" in severities
+    assert "CRITICAL" not in severities
     assert "ERROR" in severities
+    assert "WARNING" in severities
     assert str(Path("/tmp/repo")) in cmd
 
 

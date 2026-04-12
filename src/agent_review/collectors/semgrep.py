@@ -171,8 +171,10 @@ class SemgrepCollector(AbstractCollector):
             "1000000",
         ]
 
+        valid_semgrep_severities = {"INFO", "WARNING", "ERROR"}
         for sev in self._settings.semgrep_severity_filter:
-            cmd.extend(["--severity", sev])
+            if sev.upper() in valid_semgrep_severities:
+                cmd.extend(["--severity", sev.upper()])
 
         if changed_files:
             for file_path in changed_files:
