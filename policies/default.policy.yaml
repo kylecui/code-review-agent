@@ -2,7 +2,7 @@ version: 1
 collectors:
   semgrep:
     failure_mode: degraded
-    timeout_seconds: 120
+    timeout_seconds: 600
     retries: 1
   secrets:
     failure_mode: degraded

@@ -1,7 +1,12 @@
 import time
 from typing import Any
 
+import httpx
+
 from agent_review.collectors.base import AbstractCollector, CollectorContext, CollectorResult
+from agent_review.observability import get_logger
+
+logger = get_logger(__name__)
 
 
 class SecretsCollector(AbstractCollector):
@@ -41,6 +46,19 @@ class SecretsCollector(AbstractCollector):
                 duration_ms=self._duration_ms(started),
             )
         except Exception as exc:
+            # 404 = secret scanning not enabled for this repo, not a failure
+            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 404:
+                logger.info(
+                    "secrets_not_enabled",
+                    repo=context.repo,
+                )
+                return CollectorResult(
+                    collector_name=self.name,
+                    status="success",
+                    raw_findings=[],
+                    duration_ms=self._duration_ms(started),
+                    metadata={"reason": "secret_scanning_not_enabled"},
+                )
             return CollectorResult(
                 collector_name=self.name,
                 status="failure",

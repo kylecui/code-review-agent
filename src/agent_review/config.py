@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     semgrep_app_token: SecretStr | None = None
     semgrep_mode: Literal["app", "cli", "disabled"] = "app"
     semgrep_rules_path: str = "/opt/semgrep-rules"
-    semgrep_severity_filter: list[str] = ["CRITICAL", "ERROR", "WARNING"]
+    semgrep_severity_filter: list[str] = ["ERROR", "WARNING"]
 
     max_inline_comments: int = 25
     max_diff_lines: int = 10000

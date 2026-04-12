@@ -56,18 +56,20 @@ class SemgrepCollector(AbstractCollector):
     async def _collect_cli(self, context: CollectorContext, started: float) -> CollectorResult:
         """Run semgrep CLI with community rules against the PR's changed files."""
         rules_path = self._settings.semgrep_rules_path
+        is_baseline = context.run_kind == "baseline"
 
         tmpdir = tempfile.mkdtemp(prefix="semgrep_scan_")
         try:
             await self._download_repo(context, tmpdir)
             scan_dir = self._find_repo_root(tmpdir)
-            cmd = self._build_command(rules_path, context.changed_files, scan_dir)
+            cmd = self._build_command(rules_path, context.changed_files, scan_dir, is_baseline)
             logger.info(
                 "semgrep_cli_start",
                 repo=context.repo,
                 head_sha=context.head_sha,
                 file_count=len(context.changed_files),
                 rules_path=rules_path,
+                is_baseline=is_baseline,
             )
 
             proc = await asyncio.create_subprocess_exec(
@@ -155,6 +157,7 @@ class SemgrepCollector(AbstractCollector):
         rules_path: str,
         changed_files: list[str],
         scan_dir: Path,
+        is_baseline: bool = False,
     ) -> list[str]:
         cmd = [
             "semgrep",
@@ -166,9 +169,13 @@ class SemgrepCollector(AbstractCollector):
             "-j",
             "2",
             "--timeout",
-            "10",
+            "30" if is_baseline else "10",
+            "--timeout-threshold",
+            "3",
             "--max-target-bytes",
             "1000000",
+            "--max-memory",
+            "2000",
         ]
 
         valid_semgrep_severities = {"INFO", "WARNING", "ERROR"}
@@ -181,7 +188,7 @@ class SemgrepCollector(AbstractCollector):
                 full_path = scan_dir / file_path
                 if full_path.exists():
                     cmd.append(str(full_path))
-            if cmd[-1] == "1000000" or cmd[-1].startswith("--"):
+            if cmd[-1] == "1000000" or cmd[-1] == "2000" or cmd[-1].startswith("--"):
                 cmd.append(str(scan_dir))
         else:
             cmd.append(str(scan_dir))
