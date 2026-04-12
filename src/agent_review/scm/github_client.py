@@ -69,16 +69,20 @@ class GitHubClient:
         name: str,
         external_id: str,
         status: str = "in_progress",
+        conclusion: str | None = None,
     ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "name": name,
+            "head_sha": head_sha,
+            "external_id": external_id,
+            "status": status,
+        }
+        if conclusion is not None:
+            body["conclusion"] = conclusion
         response = await self._request(
             "POST",
             f"/repos/{repo}/check-runs",
-            json={
-                "name": name,
-                "head_sha": head_sha,
-                "external_id": external_id,
-                "status": status,
-            },
+            json=body,
         )
         return cast("dict[str, Any]", response.json())
 

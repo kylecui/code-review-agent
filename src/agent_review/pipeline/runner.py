@@ -186,6 +186,7 @@ class PipelineRunner:
                     name="Agent Review",
                     external_id=str(run.id),
                     status="completed",
+                    conclusion=projection.check_run_conclusion,
                 )
 
                 summary_prompt = prompt_manager.render(
