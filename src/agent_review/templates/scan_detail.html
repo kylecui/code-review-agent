@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Scan {{ run.id | string | truncate(8, True, '') }} — Agent Review{% endblock %}
+{% block content %}
+<p style="margin-bottom: 16px;"><a href="/ui/scans">&larr; Back to scans</a></p>
+
+<div class="card">
+  <h2>Run Overview</h2>
+  <table>
+    <tr><th style="width:180px;">Run ID</th><td class="mono">{{ run.id }}</td></tr>
+    <tr><th>Repository</th><td>{{ run.repo }}</td></tr>
+    <tr><th>Kind</th><td><span class="badge">{{ run.run_kind.value }}</span></td></tr>
+    <tr><th>State</th><td><span class="badge badge-{{ run.state.value }}">{{ run.state.value }}</span></td></tr>
+    <tr><th>Head SHA</th><td class="mono">{{ run.head_sha }}</td></tr>
+    {% if run.base_sha %}<tr><th>Base SHA</th><td class="mono">{{ run.base_sha }}</td></tr>{% endif %}
+    {% if run.pr_number %}<tr><th>PR #</th><td>{{ run.pr_number }}</td></tr>{% endif %}
+    <tr><th>Installation ID</th><td>{{ run.installation_id }}</td></tr>
+    <tr><th>Attempt</th><td>{{ run.attempt }}</td></tr>
+    <tr><th>Created</th><td class="mono">{{ run.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</td></tr>
+    <tr><th>Updated</th><td class="mono">{{ run.updated_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</td></tr>
+    {% if run.completed_at %}<tr><th>Completed</th><td class="mono">{{ run.completed_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</td></tr>{% endif %}
+    {% if run.error %}<tr><th>Error</th><td style="color: var(--red);">{{ run.error }}</td></tr>{% endif %}
+  </table>
+</div>
+
+{% if run.decision %}
+<div class="card">
+  <h2>Decision</h2>
+  <table>
+    <tr>
+      <th style="width:180px;">Verdict</th>
+      <td><span class="badge badge-{{ run.decision.verdict }}">{{ run.decision.verdict }}</span></td>
+    </tr>
+    <tr><th>Confidence</th><td>{{ run.decision.confidence }}</td></tr>
+    <tr><th>Summary</th><td>{{ run.decision.summary }}</td></tr>
+  </table>
+
+  {% if run.decision.blocking_findings %}
+  <h3 style="margin-top: 16px; font-size: 14px;">Blocking Findings</h3>
+  <ul style="margin: 8px 0 0 20px;">
+    {% for bf in run.decision.blocking_findings %}
+    <li>{{ bf }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if run.decision.advisory_findings %}
+  <h3 style="margin-top: 16px; font-size: 14px;">Advisory Findings</h3>
+  <ul style="margin: 8px 0 0 20px;">
+    {% for af in run.decision.advisory_findings %}
+    <li>{{ af }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if run.decision.escalation_reasons %}
+  <h3 style="margin-top: 16px; font-size: 14px;">Escalation Reasons</h3>
+  <ul style="margin: 8px 0 0 20px;">
+    {% for er in run.decision.escalation_reasons %}
+    <li>{{ er }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if run.decision.missing_evidence %}
+  <h3 style="margin-top: 16px; font-size: 14px;">Missing Evidence</h3>
+  <ul style="margin: 8px 0 0 20px;">
+    {% for me in run.decision.missing_evidence %}
+    <li>{{ me }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if run.classification %}
+<div class="card">
+  <h2>Classification</h2>
+  <table>
+    <tr><th style="width:180px;">Change Type</th><td>{{ run.classification.change_type }}</td></tr>
+    <tr><th>Domains</th><td>{{ run.classification.domains | join(', ') }}</td></tr>
+    <tr><th>Risk Level</th><td>{{ run.classification.risk_level }}</td></tr>
+    <tr><th>Profiles</th><td>{{ run.classification.profiles | join(', ') }}</td></tr>
+  </table>
+</div>
+{% endif %}
+
+{% if findings %}
+<div class="card">
+  <h2>Findings ({{ findings | length }})</h2>
+  {% for f in findings %}
+  <div class="finding-card">
+    <h3>
+      <span class="badge badge-{{ f.severity.value if f.severity.value != 'info' else 'pending' }}">{{ f.severity.value }}</span>
+      {{ f.title }}
+    </h3>
+    <div class="finding-meta">
+      <span class="mono">{{ f.file_path }}:{{ f.line_start }}</span>
+      &middot; {{ f.category }}
+      &middot; {{ ', '.join(f.source_tools) }}
+      {% if f.blocking %}&middot; <strong style="color: var(--red);">BLOCKING</strong>{% endif %}
+    </div>
+    {% if f.evidence %}
+    <p><strong>Evidence:</strong></p>
+    <ul style="margin: 4px 0 8px 20px;">
+      {% for ev in f.evidence %}
+      <li>{{ ev }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <blockquote><strong>Impact:</strong> {{ f.impact }}</blockquote>
+    <blockquote><strong>Fix:</strong> {{ f.fix_recommendation }}</blockquote>
+    {% if f.test_recommendation %}
+    <blockquote><strong>Test:</strong> {{ f.test_recommendation }}</blockquote>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if run.metrics %}
+<div class="card">
+  <h2>Performance Metrics</h2>
+  <table>
+    {% if run.metrics.classification_ms is defined %}<tr><th style="width:180px;">Classification</th><td>{{ run.metrics.classification_ms }}ms</td></tr>{% endif %}
+    {% if run.metrics.collection_ms is defined %}<tr><th>Collection</th><td>{{ run.metrics.collection_ms }}ms</td></tr>{% endif %}
+    {% if run.metrics.normalization_ms is defined %}<tr><th>Normalization</th><td>{{ run.metrics.normalization_ms }}ms</td></tr>{% endif %}
+    {% if run.metrics.reasoning_ms is defined %}<tr><th>Reasoning</th><td>{{ run.metrics.reasoning_ms }}ms</td></tr>{% endif %}
+    {% if run.metrics.gate_ms is defined %}<tr><th>Gate</th><td>{{ run.metrics.gate_ms }}ms</td></tr>{% endif %}
+    {% if run.metrics.publishing_ms is defined %}<tr><th>Publishing</th><td>{{ run.metrics.publishing_ms }}ms</td></tr>{% endif %}
+    {% if run.metrics.total_ms is defined %}<tr><th>Total</th><td><strong>{{ run.metrics.total_ms }}ms</strong></td></tr>{% endif %}
+    {% if run.metrics.finding_count is defined %}<tr><th>Finding Count</th><td>{{ run.metrics.finding_count }}</td></tr>{% endif %}
+    {% if run.metrics.llm_cost_cents is defined %}<tr><th>LLM Cost</th><td>${{ "%.4f" | format(run.metrics.llm_cost_cents / 100) }}</td></tr>{% endif %}
+    {% if run.metrics.is_degraded is defined %}<tr><th>Degraded</th><td>{{ "Yes" if run.metrics.is_degraded else "No" }}</td></tr>{% endif %}
+  </table>
+
+  {% if run.metrics.collector_metrics is defined and run.metrics.collector_metrics %}
+  <h3 style="margin-top: 16px; font-size: 14px;">Collector Breakdown</h3>
+  <table>
+    <thead>
+      <tr><th>Collector</th><th>Status</th><th>Findings</th><th>Duration</th><th>Error</th></tr>
+    </thead>
+    <tbody>
+      {% for name, cm in run.metrics.collector_metrics.items() %}
+      <tr>
+        <td>{{ name }}</td>
+        <td>{{ cm.status }}</td>
+        <td>{{ cm.finding_count }}</td>
+        <td>{{ cm.duration_ms }}ms</td>
+        <td>{{ cm.error or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

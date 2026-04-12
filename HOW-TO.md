@@ -163,6 +163,114 @@ curl http://localhost:8000/ready
 
 Once both return successfully, open a pull request on one of the installed repositories. The agent will post a Check Run and a PR Review within a few seconds.
 
+## Baseline Scanning (Full-Repository Scan)
+
+You can scan an entire repository without waiting for a PR. This is useful for establishing a baseline of existing code quality issues.
+
+### Via API
+
+```bash
+# Trigger a baseline scan
+curl -X POST https://your-server.example.com/api/scan \
+  -H 'Content-Type: application/json' \
+  -d '{"repo": "owner/repo", "installation_id": 123456}'
+
+# Response: {"status": "queued", "run_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}
+
+# Check scan status
+curl https://your-server.example.com/api/scan/<run_id>
+```
+
+### Via CLI (Local)
+
+```bash
+python -m agent_review scan \
+  --repo owner/repo \
+  --installation-id 123456 \
+  --output json          # json | markdown | github-issue
+```
+
+### Via CLI (Docker)
+
+If running in Docker Compose, use `docker exec` to run the CLI inside the container:
+
+```bash
+# JSON report (machine-readable)
+docker exec code-review-agent-app-1 \
+  python -m agent_review scan \
+  --repo owner/repo \
+  --installation-id 123456 \
+  --output json
+
+# Markdown report (detailed, human-readable)
+docker exec code-review-agent-app-1 \
+  python -m agent_review scan \
+  --repo owner/repo \
+  --installation-id 123456 \
+  --output markdown
+
+# Publish as a GitHub Issue
+docker exec code-review-agent-app-1 \
+  python -m agent_review scan \
+  --repo owner/repo \
+  --installation-id 123456 \
+  --output github-issue
+
+# Save the markdown report to a file
+docker exec code-review-agent-app-1 \
+  python -m agent_review scan \
+  --repo owner/repo \
+  --installation-id 123456 \
+  --output markdown > report.md
+
+# Scan a specific branch
+docker exec code-review-agent-app-1 \
+  python -m agent_review scan \
+  --repo owner/repo \
+  --installation-id 123456 \
+  --branch develop \
+  --output markdown
+```
+
+### CLI Options
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--repo` | Yes | Repository in `owner/name` format |
+| `--installation-id` | Yes | GitHub App installation ID |
+| `--branch` | No | Branch to scan (defaults to repo default branch) |
+| `--ref` | No | Exact commit SHA (takes precedence over `--branch`) |
+| `--output` | No | Output format: `json` (default), `markdown`, `github-issue` |
+| `--config` | No | Path to `.env` file for settings override |
+
+### Output Formats
+
+- **json**: Machine-readable JSON with verdict, findings, metrics. Best for CI pipelines and automation.
+- **markdown**: Full detailed report with executive summary, per-finding evidence/impact/fix recommendations, collector status, and performance metrics. Best for human review.
+- **github-issue**: Publishes findings as a GitHub Issue on the repository with labels `code-review` and `baseline-scan`.
+
+## Web UI
+
+The agent includes a built-in web dashboard for viewing scan results in a browser.
+
+### Accessing the Web UI
+
+Navigate to `https://your-server.example.com/ui/scans` in your browser.
+
+Available pages:
+
+| URL | Description |
+|-----|-------------|
+| `/ui/scans` | List of all scan runs (most recent first, up to 100) |
+| `/ui/scans/{run_id}` | Detail view for a specific scan run |
+
+The detail page shows:
+- **Run overview**: repository, kind, state, SHA, timestamps
+- **Decision**: verdict, confidence, summary, blocking/advisory findings, escalation reasons
+- **Classification**: change type, domains, risk level, applied profiles
+- **Findings**: severity, location, evidence, impact, fix recommendations
+- **Performance metrics**: per-stage timing, LLM cost, collector breakdown
+
 ## How It Works
 
 The agent processes each PR through a seven-stage pipeline:
@@ -350,7 +458,10 @@ src/agent_review/
 ├── database.py         # Async SQLAlchemy engine and session factory
 ├── models/             # ORM models (ReviewRun, Finding) and enums
 ├── schemas/            # Pydantic schemas (finding, decision, policy, webhook, etc.)
-├── api/                # FastAPI routers: health endpoints and webhook receiver
+├── api/                # FastAPI routers: health, scan, and webhook endpoints
+├── web/                # Web UI routes (Jinja2 SSR pages for scan results)
+├── templates/          # HTML templates (base, scan list, scan detail)
+├── reporting/          # Output formatters: JSON, Markdown, GitHub Issue
 ├── scm/                # GitHub App auth (JWT + installation tokens), REST client, projection
 ├── classifier/         # Deterministic file-pattern heuristic classifier
 ├── collectors/         # Evidence collectors: Semgrep, SonarQube, GitHub CI, Secrets
@@ -361,5 +472,5 @@ src/agent_review/
 ├── observability/      # Structured logging (structlog) and per-run metrics
 prompts/                # Jinja2 prompt templates (synthesize.j2, summarize.j2)
 policies/               # YAML policy files (default + per-repo overrides)
-tests/                  # Unit and integration tests (pytest, 137 tests, 91% coverage)
+tests/                  # Unit and integration tests (pytest, 165 tests)
 ```

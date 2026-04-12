@@ -125,7 +125,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     scan_parser.add_argument(
         "--output",
-        choices=["json", "github-issue"],
+        choices=["json", "markdown", "github-issue"],
         default="json",
         help="Output format (default: json)",
     )
@@ -165,6 +165,10 @@ def main() -> None:
 
         report = format_json_report(result)
         print(json.dumps(report, indent=2, default=str))
+    elif args.output == "markdown":
+        from agent_review.reporting.markdown_report import format_markdown_report
+
+        print(format_markdown_report(result))
     elif args.output == "github-issue":
         from agent_review.reporting.github_issue import publish_github_issue
 
