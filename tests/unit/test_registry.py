@@ -79,7 +79,7 @@ def _classification(profiles: list[str]) -> Classification:
 
 
 @pytest.mark.asyncio
-async def test_security_baseline_always_included() -> None:
+async def test_all_registered_collectors_run() -> None:
     semgrep = SleepCollector("semgrep", 0)
     secrets = SleepCollector("secrets", 0)
     extra = SleepCollector("extra", 0)
@@ -90,11 +90,11 @@ async def test_security_baseline_always_included() -> None:
 
     assert semgrep.calls == 1
     assert secrets.calls == 1
-    assert extra.calls == 0
+    assert extra.calls == 1
 
 
 @pytest.mark.asyncio
-async def test_profile_adds_extra_collectors() -> None:
+async def test_profile_require_checks_adds_missing_collectors() -> None:
     semgrep = SleepCollector("semgrep", 0)
     secrets = SleepCollector("secrets", 0)
     github_ci = SleepCollector("github_ci", 0)
@@ -150,7 +150,6 @@ async def test_retry_logic_fail_then_succeed() -> None:
     flaky = FlakyCollector()
     registry = CollectorRegistry({"semgrep": semgrep, "secrets": secrets, "flaky": flaky})
     policy = PolicyConfig(
-        profiles={"core_quality": ProfilePolicyConfig(require_checks=["flaky"])},
         collectors={"flaky": CollectorPolicyConfig(retries=1, timeout_seconds=1)},
     )
 

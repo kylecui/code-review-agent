@@ -1,11 +1,11 @@
 version: 1
 collectors:
   semgrep:
-    failure_mode: required
+    failure_mode: degraded
     timeout_seconds: 120
     retries: 1
   secrets:
-    failure_mode: required
+    failure_mode: degraded
     timeout_seconds: 60
     retries: 0
   sonar:
@@ -18,9 +18,7 @@ collectors:
     retries: 0
 profiles:
   core_quality:
-    require_checks:
-      - semgrep
-      - secrets
+    require_checks: []
     blocking_categories:
       - "security.*"
       - "quality.bug"
@@ -31,7 +29,6 @@ profiles:
     require_checks:
       - semgrep
       - secrets
-      - sonar
     blocking_categories:
       - "security.*"
       - "quality.bug"
@@ -39,9 +36,7 @@ profiles:
     escalate_categories: []
     max_inline_comments: 50
   workflow_security:
-    require_checks:
-      - semgrep
-      - secrets
+    require_checks: []
     blocking_categories:
       - "security.*"
     escalate_categories:

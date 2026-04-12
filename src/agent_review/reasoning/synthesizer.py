@@ -82,7 +82,7 @@ class Synthesizer:
             llm_response = await self._llm_client.complete(
                 model=self._settings.llm_synthesize_model,
                 messages=messages,
-                temperature=0.0,
+                temperature=self._settings.llm_temperature,
                 max_tokens=self._settings.llm_max_tokens,
             )
         except BudgetExceededError:

@@ -10,9 +10,12 @@ if TYPE_CHECKING:
     from agent_review.collectors.base import CollectorResult
 
 _SEMGREP_SEVERITY_MAP: dict[str, FindingSeverity] = {
+    "CRITICAL": FindingSeverity.CRITICAL,
     "ERROR": FindingSeverity.HIGH,
     "WARNING": FindingSeverity.MEDIUM,
     "INFO": FindingSeverity.LOW,
+    "INVENTORY": FindingSeverity.INFO,
+    "EXPERIMENT": FindingSeverity.INFO,
 }
 
 _SONAR_SEVERITY_MAP: dict[str, FindingSeverity] = {
@@ -53,28 +56,61 @@ class FindingsNormalizer:
             rule_id = self._as_str(raw.get("rule_id"), default="unknown-rule")
             path = self._as_str(raw.get("path"), default="unknown-file")
             line = self._as_int(raw.get("line"), default=1)
+            end_line_val = raw.get("end_line")
+            end_line = self._as_int(end_line_val, default=line) if end_line_val else None
             severity = _SEMGREP_SEVERITY_MAP.get(
                 self._as_str(raw.get("severity")).upper(), FindingSeverity.MEDIUM
             )
             message = self._as_str(raw.get("message"), default="Semgrep finding")
 
+            raw_confidence = self._as_str(raw.get("confidence")).upper()
+            confidence = (
+                FindingConfidence.HIGH
+                if raw_confidence == "HIGH"
+                else FindingConfidence.MEDIUM
+                if raw_confidence == "MEDIUM"
+                else FindingConfidence.LOW
+                if raw_confidence == "LOW"
+                else FindingConfidence.HIGH
+            )
+
+            raw_category = self._as_str(raw.get("category"))
+            category = (
+                self._semgrep_category_from_metadata(raw_category)
+                if raw_category
+                else self._semgrep_category(rule_id)
+            )
+
             finding_id = f"semgrep:{rule_id}:{path}:{line}"
-            fingerprint = self._fingerprint(f"semgrep|{rule_id}|{path}|{line}")
+            fingerprint_source = self._as_str(raw.get("fingerprint"))
+            fingerprint = (
+                fingerprint_source
+                if fingerprint_source
+                else self._fingerprint(f"semgrep|{rule_id}|{path}|{line}")
+            )
+
+            evidence = [message]
+            snippet = self._as_str(raw.get("snippet"))
+            if snippet:
+                evidence.append(snippet)
+            cwe = raw.get("cwe")
+            if isinstance(cwe, list) and cwe:
+                evidence.append("CWE: " + ", ".join(str(c) for c in cwe))
 
             findings.append(
                 FindingCreate(
                     finding_id=finding_id,
-                    category=self._semgrep_category(rule_id),
+                    category=category,
                     severity=severity,
-                    confidence=FindingConfidence.HIGH,
+                    confidence=confidence,
                     blocking=self._is_blocking(severity),
                     file_path=path,
                     line_start=line,
-                    line_end=None,
+                    line_end=end_line,
                     source_tools=[result.collector_name],
                     rule_id=rule_id,
                     title=f"Semgrep: {rule_id}",
-                    evidence=[message],
+                    evidence=evidence,
                     impact="Potential security or code quality issue detected by static analysis.",
                     fix_recommendation=(
                         "Review the flagged code path and apply the corresponding "
@@ -224,6 +260,17 @@ class FindingsNormalizer:
         if any(token in lowered for token in ("secret", "auth", "crypto", "sql", "xss", "csrf")):
             return "security.sast"
         return "quality.static-analysis"
+
+    @staticmethod
+    def _semgrep_category_from_metadata(raw_category: str) -> str:
+        lowered = raw_category.lower()
+        if lowered == "security":
+            return "security.sast"
+        if lowered == "correctness":
+            return "quality.bug"
+        if lowered in ("performance", "best-practice", "maintainability"):
+            return "quality.static-analysis"
+        return f"quality.{lowered}" if lowered else "quality.static-analysis"
 
     @staticmethod
     def _sonar_category(issue_type: str) -> str:

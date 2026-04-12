@@ -20,12 +20,15 @@ class Settings(BaseSettings):
     llm_synthesize_model: str = "gpt-4o"
     llm_fallback_model: str = "gpt-4o-mini"
     llm_max_tokens: int = 4096
+    llm_temperature: float = 1.0
     llm_cost_budget_per_run_cents: int = 50
 
     sonar_host_url: str | None = None
     sonar_token: SecretStr | None = None
     semgrep_app_token: SecretStr | None = None
     semgrep_mode: Literal["app", "cli", "disabled"] = "app"
+    semgrep_rules_path: str = "/opt/semgrep-rules"
+    semgrep_severity_filter: list[str] = ["CRITICAL", "ERROR", "WARNING"]
 
     max_inline_comments: int = 25
     max_diff_lines: int = 10000

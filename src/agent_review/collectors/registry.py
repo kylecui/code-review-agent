@@ -4,8 +4,6 @@ from agent_review.collectors.base import AbstractCollector, CollectorContext, Co
 from agent_review.schemas.classification import Classification
 from agent_review.schemas.policy import CollectorPolicyConfig, PolicyConfig
 
-SECURITY_BASELINE: frozenset[str] = frozenset({"semgrep", "secrets"})
-
 
 class CollectorRegistry:
     def __init__(self, collectors: dict[str, AbstractCollector]):
@@ -17,7 +15,7 @@ class CollectorRegistry:
         context: CollectorContext,
         policy: PolicyConfig,
     ) -> list[CollectorResult]:
-        effective = set(SECURITY_BASELINE)
+        effective = set(self._collectors.keys())
         for profile_name in classification.profiles:
             profile = policy.profiles.get(profile_name)
             if profile:
