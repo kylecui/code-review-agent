@@ -59,6 +59,8 @@ class BaselineRunner:
                 )
 
                 metrics.total_ms = int((time.perf_counter() - started_total) * 1000)
+                run.transition(ReviewState.PUBLISHING)
+                await db.commit()
                 run.transition(ReviewState.COMPLETED)
                 run.metrics = metrics.to_dict()
                 await db.commit()

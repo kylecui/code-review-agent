@@ -11,9 +11,6 @@ COPY pyproject.toml .
 COPY uv.lock* .
 RUN uv sync --frozen --no-dev --no-editable 2>/dev/null || uv sync --no-dev --no-editable
 
-# Install semgrep into the venv
-RUN uv pip install --no-cache-dir semgrep
-
 # Clone community rules at a pinned commit for reproducibility
 RUN git clone --depth 1 https://github.com/semgrep/semgrep-rules /opt/semgrep-rules
 
@@ -26,6 +23,9 @@ COPY alembic.ini .
 
 # Re-sync with source present so the package is fully installed into .venv
 RUN uv sync --frozen --no-dev --no-editable 2>/dev/null || uv sync --no-dev --no-editable
+
+# Install semgrep AFTER final sync so it is not removed
+RUN uv pip install --no-cache-dir semgrep
 
 # Create non-root user and hand over ownership of the app directory
 RUN useradd --create-home appuser && chown -R appuser:appuser /app
