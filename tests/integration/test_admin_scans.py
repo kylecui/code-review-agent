@@ -211,12 +211,28 @@ async def test_get_scan_not_found(client: httpx.AsyncClient) -> None:
 
 
 async def test_trigger_scan_superuser(client: httpx.AsyncClient) -> None:
+    from unittest.mock import AsyncMock, patch
+
     await _register(client, "admin@example.com")
 
-    response = await client.post(
-        "/api/admin/scans/trigger",
-        json={"repo": "owner/repo", "installation_id": 123},
-    )
+    with (
+        patch(
+            "agent_review.scm.github_client.GitHubClient.get_default_branch",
+            new_callable=AsyncMock,
+            return_value="main",
+        ),
+        patch(
+            "agent_review.scm.github_client.GitHubClient.get_branch_sha",
+            new_callable=AsyncMock,
+            return_value="a" * 40,
+        ),
+        patch("agent_review.scm.github_auth.GitHubAppAuth"),
+    ):
+        response = await client.post(
+            "/api/admin/scans/trigger",
+            json={"repo": "owner/repo", "installation_id": 123},
+        )
+
     assert response.status_code == 202
     payload = response.json()
     assert payload["repo"] == "owner/repo"

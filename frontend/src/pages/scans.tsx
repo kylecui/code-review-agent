@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useScans, useTriggerScan } from '@/hooks/use-scans'
+import { useScans, useTriggerScan, useUploadScan } from '@/hooks/use-scans'
 import type { ReviewRunRead } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
@@ -47,45 +47,62 @@ function kindBadgeClass(kind: string) {
 
 function TriggerScanDialog() {
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<'github' | 'local'>('github')
+  const [mode, setMode] = useState<'github' | 'upload'>('github')
   const [repo, setRepo] = useState('')
   const [installationId, setInstallationId] = useState('')
-  const [path, setPath] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const triggerScan = useTriggerScan()
+  const uploadScan = useUploadScan()
+
+  const isSubmitting = triggerScan.isPending || uploadScan.isPending
 
   const resetForm = () => {
     setRepo('')
     setInstallationId('')
-    setPath('')
+    setSelectedFile(null)
     setError(null)
+  }
+
+  const handleError = (mutationError: unknown) => {
+    if (mutationError instanceof Error) {
+      setError(mutationError.message)
+    } else {
+      setError('Failed to trigger scan')
+    }
   }
 
   const handleSubmit: NonNullable<React.ComponentProps<'form'>['onSubmit']> = (event) => {
     event.preventDefault()
     setError(null)
 
-    const body =
-      mode === 'github'
-        ? {
-            repo: repo || undefined,
-            installation_id: installationId ? Number(installationId) : undefined,
-          }
-        : { path: path || undefined }
-
-    triggerScan.mutate(body, {
-      onSuccess: () => {
-        setOpen(false)
-        resetForm()
-      },
-      onError: (mutationError) => {
-        if (mutationError instanceof Error) {
-          setError(mutationError.message)
-        } else {
-          setError('Failed to trigger scan')
-        }
-      },
-    })
+    if (mode === 'github') {
+      triggerScan.mutate(
+        {
+          repo: repo || undefined,
+          installation_id: installationId ? Number(installationId) : undefined,
+        },
+        {
+          onSuccess: () => {
+            setOpen(false)
+            resetForm()
+          },
+          onError: handleError,
+        },
+      )
+    } else {
+      if (!selectedFile) {
+        setError('Please select a file to upload')
+        return
+      }
+      uploadScan.mutate(selectedFile, {
+        onSuccess: () => {
+          setOpen(false)
+          resetForm()
+        },
+        onError: handleError,
+      })
+    }
   }
 
   return (
@@ -124,16 +141,16 @@ function TriggerScanDialog() {
               type="button"
               className={cn(
                 'flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors',
-                mode === 'local'
+                mode === 'upload'
                   ? 'border-zinc-900 bg-zinc-900 text-white'
                   : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50',
               )}
               onClick={() => {
-                setMode('local')
+                setMode('upload')
                 setError(null)
               }}
             >
-              Local Directory
+              Upload Project
             </button>
           </div>
 
@@ -163,16 +180,23 @@ function TriggerScanDialog() {
           ) : (
             <>
               <p className="text-xs text-zinc-500">
-                Scan a directory on the server's filesystem. The path must be accessible from within the running
-                container.
+                Upload a project archive to scan. Supports .zip, .tar.gz, .tgz, .tar.bz2, and .tar.xz formats. Max 200 MB.
               </p>
               <div className="space-y-1">
-                <label className="text-sm font-medium text-zinc-700">Server Path</label>
-                <Input value={path} onChange={(event) => setPath(event.target.value)} placeholder="/opt/repos/myproject" />
-                <p className="text-xs text-zinc-400">
-                  Absolute path on the server (not your local machine). Mount directories into the container via Docker
-                  volumes if needed.
-                </p>
+                <label className="text-sm font-medium text-zinc-700">Project Archive</label>
+                <Input
+                  type="file"
+                  accept=".zip,.tar,.tar.gz,.tgz,.tar.bz2,.tar.xz"
+                  onChange={(event) => {
+                    setSelectedFile(event.target.files?.[0] ?? null)
+                    setError(null)
+                  }}
+                />
+                {selectedFile ? (
+                  <p className="text-xs text-zinc-400">
+                    Selected: {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(1)} MB)
+                  </p>
+                ) : null}
               </div>
             </>
           )}
@@ -182,8 +206,10 @@ function TriggerScanDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={triggerScan.isPending}>
-              {triggerScan.isPending ? 'Triggering…' : 'Trigger'}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting
+                ? (mode === 'upload' ? 'Uploading…' : 'Triggering…')
+                : (mode === 'upload' ? 'Upload & Scan' : 'Trigger')}
             </Button>
           </DialogFooter>
         </form>

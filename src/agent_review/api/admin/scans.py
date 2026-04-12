@@ -1,21 +1,52 @@
 from __future__ import annotations
 
+import hashlib
+import shutil
+import tarfile
 import uuid
+import zipfile
+from pathlib import Path
 from typing import Annotated, Any, ClassVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+import httpx
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from agent_review.auth.dependencies import get_current_superuser, get_current_user
 from agent_review.models import InvalidTransition, ReviewRun, ReviewState, RunKind, User
+from agent_review.pipeline.baseline_runner import BaselineRunner
+from agent_review.pipeline.local_runner import LocalBaselineRunner
 from agent_review.schemas.finding import FindingRead
 from agent_review.schemas.review_run import ReviewRunRead
 
 router = APIRouter(tags=["admin-scans"])
 CurrentUser = Annotated[User, Depends(get_current_user)]
 CurrentSuperuser = Annotated[User, Depends(get_current_superuser)]
+
+ALLOWED_CONTENT_TYPES = frozenset(
+    {
+        "application/zip",
+        "application/x-zip-compressed",
+        "application/gzip",
+        "application/x-gzip",
+        "application/x-tar",
+        "application/x-compressed-tar",
+        "application/octet-stream",
+    }
+)
+
+ALLOWED_EXTENSIONS = frozenset({".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz"})
 
 
 class PaginatedScans(BaseModel):
@@ -33,7 +64,6 @@ class ScanDetailResponse(BaseModel):
 class TriggerScanBody(BaseModel):
     repo: str | None = None
     installation_id: int | None = None
-    path: str | None = None
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
@@ -54,6 +84,61 @@ def _parse_kind_filter(raw_kind: str | None) -> RunKind | None:
         return RunKind(raw_kind)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=f"Invalid kind: {raw_kind}") from exc
+
+
+def _validate_upload_filename(filename: str | None) -> str:
+    if not filename:
+        raise HTTPException(status_code=422, detail="Uploaded file must have a filename")
+    lower = filename.lower()
+    if not any(lower.endswith(ext) for ext in ALLOWED_EXTENSIONS):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported file type. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+    return filename
+
+
+def _extract_archive(archive_path: Path, extract_dir: Path) -> Path:
+    if zipfile.is_zipfile(archive_path):
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            zf.extractall(extract_dir)
+    elif tarfile.is_tarfile(archive_path):
+        with tarfile.open(archive_path, "r:*") as tf:
+            tf.extractall(extract_dir, filter="data")
+    else:
+        raise HTTPException(status_code=422, detail="File is not a valid zip or tar archive")
+
+    children = list(extract_dir.iterdir())
+    if len(children) == 1 and children[0].is_dir():
+        return children[0]
+    return extract_dir
+
+
+async def _run_upload_scan(
+    request: Request, run_id: str, local_path: str, cleanup_dir: str
+) -> None:
+    settings = request.app.state.settings
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as http_client:
+            runner = LocalBaselineRunner(
+                settings=settings,
+                session_factory=request.app.state.session_factory,
+                http_client=http_client,
+            )
+            await runner.run(run_id, local_path)
+    finally:
+        shutil.rmtree(cleanup_dir, ignore_errors=True)
+
+
+async def _run_github_baseline(request: Request, run_id: str) -> None:
+    settings = request.app.state.settings
+    async with httpx.AsyncClient(timeout=120.0) as http_client:
+        runner = BaselineRunner(
+            settings=settings,
+            session_factory=request.app.state.session_factory,
+            http_client=http_client,
+        )
+        await runner.run(run_id)
 
 
 @router.get("/", response_model=PaginatedScans)
@@ -135,17 +220,35 @@ async def get_scan(
 async def trigger_scan(
     body: TriggerScanBody,
     request: Request,
+    background_tasks: BackgroundTasks,
     current_user: CurrentSuperuser,
 ) -> ReviewRunRead:
     _ = current_user
-    if body.repo is None and body.path is None:
-        raise HTTPException(status_code=422, detail="Either 'repo' or 'path' must be provided")
+    if body.repo is None:
+        raise HTTPException(status_code=422, detail="'repo' is required (owner/name)")
+    if body.installation_id is None:
+        raise HTTPException(
+            status_code=422, detail="'installation_id' is required for GitHub scans"
+        )
 
+    settings = request.app.state.settings
     session_factory = request.app.state.session_factory
-    head_sha = f"{uuid.uuid4().hex}{uuid.uuid4().hex[:8]}"
+
+    from agent_review.scm.github_auth import GitHubAppAuth
+    from agent_review.scm.github_client import GitHubClient
+
+    auth = GitHubAppAuth(
+        settings.github_app_id,
+        settings.github_private_key.get_secret_value(),
+    )
+    async with httpx.AsyncClient(timeout=30.0) as http_client:
+        github = GitHubClient(http_client, auth, body.installation_id)
+        default_branch = await github.get_default_branch(body.repo)
+        head_sha = await github.get_branch_sha(body.repo, default_branch)
+
     run = ReviewRun(
         id=uuid.uuid4(),
-        repo=body.repo or body.path or "local/path",
+        repo=body.repo,
         run_kind=RunKind.BASELINE,
         head_sha=head_sha,
         state=ReviewState.PENDING,
@@ -156,7 +259,86 @@ async def trigger_scan(
         db.add(run)
         await db.commit()
         await db.refresh(run)
+        run_id = str(run.id)
 
+    background_tasks.add_task(_run_github_baseline, request, run_id)
+    return ReviewRunRead.model_validate(run)
+
+
+@router.post("/upload", response_model=ReviewRunRead, status_code=status.HTTP_202_ACCEPTED)
+async def upload_scan(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current_user: CurrentSuperuser,
+    file: UploadFile = ...,
+) -> ReviewRunRead:
+    _ = current_user
+    settings = request.app.state.settings
+    session_factory = request.app.state.session_factory
+
+    filename = _validate_upload_filename(file.filename)
+
+    upload_base = Path(settings.upload_dir)
+    upload_base.mkdir(parents=True, exist_ok=True)
+
+    run_uuid = uuid.uuid4()
+    job_dir = upload_base / str(run_uuid)
+    job_dir.mkdir()
+
+    archive_path = job_dir / filename
+    try:
+        total_bytes = 0
+        with archive_path.open("wb") as f:
+            while chunk := await file.read(1024 * 1024):
+                total_bytes += len(chunk)
+                if total_bytes > settings.upload_max_bytes:
+                    shutil.rmtree(job_dir, ignore_errors=True)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            f"File too large. Maximum size: "
+                            f"{settings.upload_max_bytes // (1024 * 1024)} MB"
+                        ),
+                    )
+                f.write(chunk)
+    except HTTPException:
+        raise
+    except Exception:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise HTTPException(status_code=500, detail="Failed to save uploaded file") from None
+
+    extract_dir = job_dir / "extracted"
+    extract_dir.mkdir()
+    try:
+        project_root = _extract_archive(archive_path, extract_dir)
+    except HTTPException:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
+    except Exception:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise HTTPException(status_code=422, detail="Failed to extract archive") from None
+
+    archive_path.unlink(missing_ok=True)
+
+    project_name = project_root.name if project_root != extract_dir else Path(filename).stem
+    head_sha = hashlib.sha1(f"{run_uuid}:{filename}".encode()).hexdigest()
+
+    run = ReviewRun(
+        id=run_uuid,
+        repo=f"upload/{project_name}",
+        run_kind=RunKind.BASELINE,
+        head_sha=head_sha,
+        state=ReviewState.PENDING,
+        installation_id=None,
+    )
+
+    async with session_factory() as db:
+        db.add(run)
+        await db.commit()
+        await db.refresh(run)
+        run_id = str(run.id)
+
+    background_tasks.add_task(_run_upload_scan, request, run_id, str(project_root), str(job_dir))
     return ReviewRunRead.model_validate(run)
 
 

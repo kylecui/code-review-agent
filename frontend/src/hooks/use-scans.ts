@@ -57,7 +57,7 @@ export function useTriggerScan() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (body: { repo?: string; installation_id?: number; path?: string }) => {
+    mutationFn: async (body: { repo?: string; installation_id?: number }) => {
       const result = await triggerScanApiAdminScansTriggerPost({
         client: apiClient,
         body,
@@ -66,6 +66,34 @@ export function useTriggerScan() {
         throw new Error(normalizeError(result.error, 'Failed to trigger scan'))
       }
       return result.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scans'] })
+    },
+  })
+}
+
+export function useUploadScan() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/admin/scans/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null)
+        const detail = body?.detail
+        throw new Error(typeof detail === 'string' ? detail : `Upload failed (${response.status})`)
+      }
+
+      return response.json()
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scans'] })

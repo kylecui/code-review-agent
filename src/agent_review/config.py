@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     policy_dir: Path = Path("./policies")
     prompts_dir: Path = Path("./prompts")
     frontend_dir: Path = Path("./static")
+    upload_dir: Path = Path("/tmp/agent_review_uploads")
+    upload_max_bytes: int = 200 * 1024 * 1024  # 200 MB
 
     cors_origins: list[str] = []
 
