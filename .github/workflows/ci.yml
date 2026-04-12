@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  check:
+  backend-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,3 +18,21 @@ jobs:
       - run: uv run ruff format --check src/ tests/
       - run: uv run mypy src/
       - run: uv run pytest --cov=agent_review --cov-report=xml -x
+
+  frontend-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run lint
+        working-directory: frontend
+      - run: npm run type-check
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
