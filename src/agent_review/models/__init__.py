@@ -11,6 +11,7 @@ from .enums import (
     Verdict,
 )
 from .finding import Finding
+from .policy_store import PolicyStore
 from .review_run import InvalidTransition, ReviewRun
 from .user import User
 
@@ -23,6 +24,7 @@ __all__ = [
     "FindingDisposition",
     "FindingSeverity",
     "InvalidTransition",
+    "PolicyStore",
     "ReviewRun",
     "ReviewState",
     "RunKind",

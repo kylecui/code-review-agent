@@ -11,6 +11,8 @@ from agent_review.schemas.policy import PolicyConfig
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from sqlalchemy.ext.asyncio import AsyncSession
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,6 +47,46 @@ class PolicyLoader:
             return PolicyConfig.model_validate(normalized_data)
         except ValidationError as exc:
             logger.warning("Policy validation failed for %s: %s", policy_path, exc)
+            return PolicyConfig()
+
+    async def load_from_db(
+        self, session: AsyncSession, repo: str | None = None
+    ) -> PolicyConfig | None:
+        """Load policy from DB. Returns None if no DB policy found."""
+        from sqlalchemy import select
+
+        from agent_review.models.policy_store import PolicyStore
+
+        if repo:
+            result = await session.execute(select(PolicyStore).where(PolicyStore.name == repo))
+            policy = result.scalar_one_or_none()
+            if policy is not None:
+                return self._parse_yaml_content(policy.content)
+
+        result = await session.execute(select(PolicyStore).where(PolicyStore.name == "default"))
+        policy = result.scalar_one_or_none()
+        if policy is not None:
+            return self._parse_yaml_content(policy.content)
+
+        return None
+
+    def _parse_yaml_content(self, content: str) -> PolicyConfig:
+        """Parse YAML content string into PolicyConfig."""
+        try:
+            raw_data = yaml.safe_load(content)
+        except yaml.YAMLError as exc:
+            logger.warning("Failed to parse policy YAML content: %s", exc)
+            return PolicyConfig()
+        if raw_data is None:
+            return PolicyConfig()
+        if not isinstance(raw_data, dict):
+            logger.warning("Policy YAML content must be a mapping")
+            return PolicyConfig()
+        normalized_data = {str(key): value for key, value in raw_data.items()}
+        try:
+            return PolicyConfig.model_validate(normalized_data)
+        except ValidationError as exc:
+            logger.warning("Policy validation failed: %s", exc)
             return PolicyConfig()
 
     def _resolve_policy_path(self, repo: str | None) -> Path | None:
