@@ -11,6 +11,7 @@ from .enums import (
 )
 from .finding import Finding
 from .review_run import InvalidTransition, ReviewRun
+from .user import User
 
 __all__ = [
     "Base",
@@ -24,5 +25,6 @@ __all__ = [
     "ReviewState",
     "RunKind",
     "TriggerEvent",
+    "User",
     "Verdict",
 ]

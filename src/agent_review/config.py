@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     github_app_id: int = 0
     github_private_key: SecretStr = SecretStr("")
     github_webhook_secret: SecretStr = SecretStr("")
+    secret_key: SecretStr = SecretStr("change-me-in-production")
+    access_token_expire_minutes: int = 60
+
+    github_oauth_client_id: str = ""
+    github_oauth_client_secret: SecretStr = SecretStr("")
+    oauth_redirect_uri: str = ""
 
     llm_classify_model: str = "gpt-4o-mini"
     llm_synthesize_model: str = "gpt-4o"
