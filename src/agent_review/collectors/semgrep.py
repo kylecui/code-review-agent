@@ -107,6 +107,11 @@ class SemgrepCollector(AbstractCollector):
                 )
 
             raw_findings = self._parse_cli_output(stdout_text)
+            scan_dir_prefix = str(scan_dir) + "/"
+            for finding in raw_findings:
+                p = str(finding.get("path", ""))
+                if p.startswith(scan_dir_prefix):
+                    finding["path"] = p[len(scan_dir_prefix) :]
             is_partial = proc.returncode == 7
             logger.info(
                 "semgrep_cli_done",

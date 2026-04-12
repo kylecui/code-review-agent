@@ -38,7 +38,17 @@
   <h3 style="margin-top: 16px; font-size: 14px;">Blocking Findings</h3>
   <ul style="margin: 8px 0 0 20px;">
     {% for bf in run.decision.blocking_findings %}
-    <li>{{ bf }}</li>
+    <li class="mono" style="font-size: 13px;">
+      {% set parts = bf.split(':') %}
+      {% if parts | length >= 4 %}
+        {% set fpath = ':'.join(parts[2:-1]) %}
+        {% set fline = parts[-1] %}
+        <a href="https://github.com/{{ run.repo }}/blob/{{ run.head_sha }}/{{ fpath }}#L{{ fline }}" target="_blank" rel="noopener">{{ fpath }}:{{ fline }}</a>
+        <span style="color: var(--text-muted);"> — {{ parts[1] }}</span>
+      {% else %}
+        {{ bf }}
+      {% endif %}
+    </li>
     {% endfor %}
   </ul>
   {% endif %}
@@ -47,7 +57,17 @@
   <h3 style="margin-top: 16px; font-size: 14px;">Advisory Findings</h3>
   <ul style="margin: 8px 0 0 20px;">
     {% for af in run.decision.advisory_findings %}
-    <li>{{ af }}</li>
+    <li class="mono" style="font-size: 13px;">
+      {% set parts = af.split(':') %}
+      {% if parts | length >= 4 %}
+        {% set fpath = ':'.join(parts[2:-1]) %}
+        {% set fline = parts[-1] %}
+        <a href="https://github.com/{{ run.repo }}/blob/{{ run.head_sha }}/{{ fpath }}#L{{ fline }}" target="_blank" rel="noopener">{{ fpath }}:{{ fline }}</a>
+        <span style="color: var(--text-muted);"> — {{ parts[1] }}</span>
+      {% else %}
+        {{ af }}
+      {% endif %}
+    </li>
     {% endfor %}
   </ul>
   {% endif %}
@@ -94,7 +114,7 @@
       {{ f.title }}
     </h3>
     <div class="finding-meta">
-      <span class="mono">{{ f.file_path }}:{{ f.line_start }}</span>
+      <a href="https://github.com/{{ run.repo }}/blob/{{ run.head_sha }}/{{ f.file_path }}#L{{ f.line_start }}" target="_blank" rel="noopener" class="mono">{{ f.file_path }}:{{ f.line_start }}</a>
       &middot; {{ f.category }}
       &middot; {{ ', '.join(f.source_tools) }}
       {% if f.blocking %}&middot; <strong style="color: var(--red);">BLOCKING</strong>{% endif %}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,7 @@ from agent_review.collectors.secrets import SecretsCollector
 from agent_review.collectors.semgrep import SemgrepCollector
 from agent_review.collectors.sonar import SonarCollector
 from agent_review.gate import GateController, PolicyLoader
+from agent_review.models import Finding
 from agent_review.normalize import FindingsDeduplicator, FindingsNormalizer
 from agent_review.reasoning import LLMClient, PromptManager, Synthesizer
 
@@ -105,6 +107,31 @@ async def run_analysis(
     raw_findings = normalizer.normalize(collector_results)
     deduplicator = FindingsDeduplicator()
     findings = deduplicator.deduplicate(raw_findings)
+    for f in findings:
+        db.add(
+            Finding(
+                id=uuid.uuid4(),
+                review_run_id=run.id,
+                finding_id=f.finding_id,
+                category=f.category,
+                severity=f.severity,
+                confidence=f.confidence,
+                blocking=f.blocking,
+                file_path=f.file_path,
+                line_start=f.line_start,
+                line_end=f.line_end,
+                source_tools=f.source_tools,
+                rule_id=f.rule_id,
+                title=f.title,
+                evidence=f.evidence,
+                impact=f.impact,
+                fix_recommendation=f.fix_recommendation,
+                test_recommendation=f.test_recommendation,
+                fingerprint=f.fingerprint,
+                disposition=f.disposition,
+            )
+        )
+    await db.commit()
     metrics.normalization_ms = int((time.perf_counter() - stage_started) * 1000)
     metrics.finding_count = len(findings)
 
