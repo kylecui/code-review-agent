@@ -82,12 +82,7 @@ class FindingsNormalizer:
             )
 
             finding_id = f"semgrep:{rule_id}:{path}:{line}"
-            fingerprint_source = self._as_str(raw.get("fingerprint"))
-            fingerprint = (
-                fingerprint_source
-                if fingerprint_source
-                else self._fingerprint(f"semgrep|{rule_id}|{path}|{line}")
-            )
+            fingerprint = self._fingerprint(f"semgrep|{rule_id}|{path}|{line}")
 
             evidence = [message]
             snippet = self._as_str(raw.get("snippet"))
