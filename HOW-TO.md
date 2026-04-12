@@ -76,13 +76,41 @@ AGENT_REVIEW_LOG_LEVEL=INFO
 AGENT_REVIEW_LOG_FORMAT=json                             # "json" for production, "console" for dev
 ```
 
-You also need to set the LLM provider API key in the environment. For OpenAI:
+You also need to set the LLM provider API key in the environment. The agent uses [litellm](https://docs.litellm.ai/docs/providers) as its LLM abstraction, so you can swap providers by changing the model strings and API key.
+
+**OpenAI:**
 
 ```bash
 export OPENAI_API_KEY=sk-...
+
+# Model strings (default, no prefix needed):
+AGENT_REVIEW_LLM_CLASSIFY_MODEL=gpt-4o-mini
+AGENT_REVIEW_LLM_SYNTHESIZE_MODEL=gpt-4o
 ```
 
-For other providers (Anthropic, Azure, etc.), see the [litellm docs](https://docs.litellm.ai/docs/providers).
+**Google Gemini (AI Studio):**
+
+```bash
+export GEMINI_API_KEY=your-gemini-api-key
+
+# Model strings use the "gemini/" prefix:
+AGENT_REVIEW_LLM_CLASSIFY_MODEL=gemini/gemini-2.0-flash
+AGENT_REVIEW_LLM_SYNTHESIZE_MODEL=gemini/gemini-2.5-pro
+```
+
+**GitHub Models:**
+
+Get a personal access token from [github.com/marketplace/models](https://github.com/marketplace/models).
+
+```bash
+export GITHUB_API_KEY=ghp_...
+
+# Model strings use the "github/" prefix:
+AGENT_REVIEW_LLM_CLASSIFY_MODEL=github/gpt-4o-mini
+AGENT_REVIEW_LLM_SYNTHESIZE_MODEL=github/gpt-4o
+```
+
+For other providers (Anthropic, Azure, Vertex AI, etc.), see the [litellm provider docs](https://docs.litellm.ai/docs/providers).
 
 ## Step 3: Deploy
 
