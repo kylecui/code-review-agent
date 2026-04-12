@@ -135,6 +135,9 @@ class FakeGateController:
 
 
 class FakePromptManager:
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        pass
+
     def render(self, _template_name: str, **_context: object) -> str:
         return "summary"
 

@@ -11,9 +11,7 @@ class TemplateNotFoundError(Exception):
 
 class PromptManager:
     def __init__(self, template_dir: Path | None = None):
-        resolved_dir = (
-            template_dir or Path(__file__).resolve().parent.parent.parent.parent / "prompts"
-        )
+        resolved_dir = template_dir or Path("./prompts")
         if not resolved_dir.exists() or not resolved_dir.is_dir():
             raise TemplateNotFoundError(f"Template directory not found: {resolved_dir}")
         self._environment = Environment(

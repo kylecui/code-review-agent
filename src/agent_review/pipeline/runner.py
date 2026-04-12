@@ -143,7 +143,7 @@ class PipelineRunner:
                 await db.commit()
 
                 llm_client = LLMClient(self._settings)
-                prompt_manager = PromptManager()
+                prompt_manager = PromptManager(self._settings.prompts_dir)
                 synthesizer = Synthesizer(llm_client, prompt_manager, self._settings)
                 synthesis = await synthesizer.synthesize(findings, ctx)
                 metrics.reasoning_ms = int((time.perf_counter() - stage_started) * 1000)

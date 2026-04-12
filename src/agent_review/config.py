@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     max_diff_lines: int = 10000
 
     policy_dir: Path = Path("./policies")
+    prompts_dir: Path = Path("./prompts")
 
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"

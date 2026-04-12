@@ -334,6 +334,9 @@ Verify that `OPENAI_API_KEY` (or your provider's key) is set in the environment.
 **No review posted on the PR**
 Confirm the GitHub App has **Checks** (Read & Write) and **Pull requests** (Read & Write) permissions. Verify the app is installed on the target repository. Check that the PR is not a draft and was not opened by a bot.
 
+**Template directory not found**
+If logs show `Template directory not found: .../prompts`, the `prompts/` directory is not visible from the working directory the app runs in. Set `AGENT_REVIEW_PROMPTS_DIR` to the absolute path of the `prompts/` directory inside the container (e.g. `/app/prompts`). In Docker, the default `./prompts` resolves relative to the `WORKDIR /app` so it should work out of the box. If you changed `WORKDIR`, update this setting accordingly.
+
 **Viewing logs**
 - Docker: `docker compose logs -f app`
 - Local dev: logs print to the console. Set `AGENT_REVIEW_LOG_FORMAT=console` for human-readable output.
