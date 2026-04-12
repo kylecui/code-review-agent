@@ -42,5 +42,7 @@ class Settings(BaseSettings):
     policy_dir: Path = Path("./policies")
     prompts_dir: Path = Path("./prompts")
 
+    cors_origins: list[str] = []
+
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"
