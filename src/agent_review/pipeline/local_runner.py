@@ -7,8 +7,6 @@ from typing import TYPE_CHECKING
 from agent_review.models import ReviewRun, ReviewState
 from agent_review.observability import RunMetrics, get_logger
 from agent_review.pipeline.analysis import AnalysisResult, run_analysis
-from agent_review.scm.github_auth import GitHubAppAuth
-from agent_review.scm.github_client import GitHubClient
 
 if TYPE_CHECKING:
     import httpx
@@ -19,7 +17,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-class BaselineRunner:
+class LocalBaselineRunner:
     def __init__(
         self,
         settings: Settings,
@@ -30,7 +28,7 @@ class BaselineRunner:
         self._session_factory = session_factory
         self._http_client = http_client
 
-    async def run(self, run_id: str) -> AnalysisResult | None:
+    async def run(self, run_id: str, local_path: str) -> AnalysisResult | None:
         metrics = RunMetrics(run_id=run_id)
         started_total = time.perf_counter()
         run: ReviewRun | None = None
@@ -41,23 +39,16 @@ class BaselineRunner:
                 if run is None or run.is_terminal:
                     return None
 
-                auth = GitHubAppAuth(
-                    self._settings.github_app_id,
-                    self._settings.github_private_key.get_secret_value(),
-                )
-                if run.installation_id is None:
-                    raise RuntimeError("GitHub baseline scan requires installation_id")
-                github = GitHubClient(self._http_client, auth, run.installation_id)
-
                 result = await run_analysis(
                     run=run,
                     db=db,
                     settings=self._settings,
                     http_client=self._http_client,
-                    github=github,
+                    github=None,
                     changed_files=[],
                     pr_labels=[],
                     metrics=metrics,
+                    local_path=local_path,
                 )
 
                 metrics.total_ms = int((time.perf_counter() - started_total) * 1000)
@@ -68,7 +59,7 @@ class BaselineRunner:
                 await db.commit()
                 return result
         except Exception as exc:
-            logger.error("baseline_pipeline_failed", run_id=run_id, error=str(exc))
+            logger.error("local_baseline_pipeline_failed", run_id=run_id, error=str(exc))
             if run is None:
                 return None
             try:

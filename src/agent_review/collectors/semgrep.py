@@ -58,10 +58,25 @@ class SemgrepCollector(AbstractCollector):
         rules_path = self._settings.semgrep_rules_path
         is_baseline = context.run_kind == "baseline"
 
-        tmpdir = tempfile.mkdtemp(prefix="semgrep_scan_")
+        use_local = context.local_path is not None
+        tmpdir: str | None = None
         try:
-            await self._download_repo(context, tmpdir)
-            scan_dir = self._find_repo_root(tmpdir)
+            if use_local:
+                scan_dir = Path(context.local_path)  # type: ignore[arg-type]
+                if not scan_dir.is_dir():
+                    return CollectorResult(
+                        collector_name=self.name,
+                        status="failure",
+                        raw_findings=[],
+                        duration_ms=self._duration_ms(started),
+                        error=f"Local path does not exist: {context.local_path}",
+                        metadata={"mode": "cli"},
+                    )
+            else:
+                tmpdir = tempfile.mkdtemp(prefix="semgrep_scan_")
+                await self._download_repo(context, tmpdir)
+                scan_dir = self._find_repo_root(tmpdir)
+
             cmd = self._build_command(rules_path, context.changed_files, scan_dir, is_baseline)
             logger.info(
                 "semgrep_cli_start",
@@ -132,10 +147,13 @@ class SemgrepCollector(AbstractCollector):
                 },
             )
         finally:
-            shutil.rmtree(tmpdir, ignore_errors=True)
+            if tmpdir is not None:
+                shutil.rmtree(tmpdir, ignore_errors=True)
 
     async def _download_repo(self, context: CollectorContext, tmpdir: str) -> None:
         """Download and extract the repo at head_sha via GitHub tarball API."""
+        if context.github_client is None:
+            raise RuntimeError("Cannot download repo without GitHub client")
         token = await context.github_client._get_token()
         tarball_url = f"https://api.github.com/repos/{context.repo}/tarball/{context.head_sha}"
         response = await self._http.get(

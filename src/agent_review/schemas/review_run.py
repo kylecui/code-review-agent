@@ -13,7 +13,7 @@ class ReviewRunCreate(BaseModel):
     pr_number: int | None = None
     head_sha: str = Field(min_length=40, max_length=40)
     base_sha: str | None = Field(default=None, min_length=40, max_length=40)
-    installation_id: int
+    installation_id: int | None = None
     trigger_event: TriggerEvent | None = None
     delivery_id: str | None = None
 
@@ -25,7 +25,7 @@ class ReviewRunRead(BaseModel):
     pr_number: int | None
     head_sha: str
     base_sha: str | None
-    installation_id: int
+    installation_id: int | None
     attempt: int
     state: ReviewState
     superseded_by: uuid.UUID | None
@@ -65,4 +65,8 @@ class ScanRequest(BaseModel):
         min_length=40,
         max_length=40,
         description="Exact commit SHA to scan; takes precedence over branch",
+    )
+    path: str | None = Field(
+        default=None,
+        description="Local filesystem path to scan (standalone mode, no GitHub required)",
     )

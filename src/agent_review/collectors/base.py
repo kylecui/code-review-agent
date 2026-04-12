@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import ClassVar, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
 
-from agent_review.scm.github_client import GitHubClient
+if TYPE_CHECKING:
+    from agent_review.scm.github_client import GitHubClient
 
 CollectorStatus = Literal["success", "failure", "timeout", "skipped"]
 
@@ -12,10 +15,11 @@ class CollectorContext:
     repo: str
     head_sha: str
     changed_files: list[str]
-    github_client: GitHubClient
+    github_client: GitHubClient | None = None
     run_kind: str = "pr"
     pr_number: int | None = None
     base_sha: str | None = None
+    local_path: str | None = None
 
 
 @dataclass(slots=True)

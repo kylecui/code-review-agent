@@ -66,7 +66,7 @@ class ReviewRun(Base):
     pr_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     head_sha: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     base_sha: Mapped[str | None] = mapped_column(String(40), nullable=True)
-    installation_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    installation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     state: Mapped[ReviewState] = mapped_column(
         Enum(ReviewState),

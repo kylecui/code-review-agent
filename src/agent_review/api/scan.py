@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import uuid
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import httpx
@@ -8,6 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 from agent_review.models import ReviewRun, RunKind
 from agent_review.pipeline.baseline_runner import BaselineRunner
+from agent_review.pipeline.local_runner import LocalBaselineRunner
 from agent_review.schemas.review_run import ReviewRunRead, ScanRequest
 from agent_review.scm.github_auth import GitHubAppAuth
 from agent_review.scm.github_client import GitHubClient
@@ -29,6 +32,10 @@ async def _resolve_head_sha(
     return await github.get_branch_sha(repo, default_branch)
 
 
+def _path_hash(path: str) -> str:
+    return hashlib.sha1(path.encode()).hexdigest()
+
+
 async def _run_baseline(request: Request, run_id: str) -> None:
     settings: Settings = request.app.state.settings
     async with httpx.AsyncClient(timeout=120.0) as http_client:
@@ -40,6 +47,17 @@ async def _run_baseline(request: Request, run_id: str) -> None:
         await runner.run(run_id)
 
 
+async def _run_local_baseline(request: Request, run_id: str, local_path: str) -> None:
+    settings: Settings = request.app.state.settings
+    async with httpx.AsyncClient(timeout=120.0) as http_client:
+        runner = LocalBaselineRunner(
+            settings=settings,
+            session_factory=request.app.state.session_factory,
+            http_client=http_client,
+        )
+        await runner.run(run_id, local_path)
+
+
 @router.post("/scan", status_code=202)
 async def create_scan(
     body: ScanRequest,
@@ -48,6 +66,37 @@ async def create_scan(
 ) -> dict[str, str]:
     settings: Settings = request.app.state.settings
     session_factory = request.app.state.session_factory
+
+    is_local = body.path is not None
+
+    if is_local:
+        local_path = body.path
+        assert local_path is not None
+        if not Path(local_path).is_dir():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Local path does not exist or is not a directory: {local_path}",
+            )
+        head_sha = _path_hash(local_path)
+        run = ReviewRun(
+            id=uuid.uuid4(),
+            repo=body.repo,
+            run_kind=RunKind.BASELINE,
+            pr_number=None,
+            head_sha=head_sha,
+            base_sha=None,
+            installation_id=None,
+            trigger_event=None,
+            delivery_id=None,
+        )
+        async with session_factory() as db:
+            db.add(run)
+            await db.commit()
+            await db.refresh(run)
+            run_id = str(run.id)
+
+        background_tasks.add_task(_run_local_baseline, request, run_id, local_path)
+        return {"status": "queued", "run_id": run_id}
 
     auth = GitHubAppAuth(
         settings.github_app_id,
@@ -58,7 +107,9 @@ async def create_scan(
     if installation_id is None:
         raise HTTPException(
             status_code=400,
-            detail="installation_id is required (auto-discovery not yet implemented)",
+            detail=(
+                "installation_id is required for GitHub scans (or provide 'path' for local scan)"
+            ),
         )
 
     async with httpx.AsyncClient(timeout=30.0) as http_client:

@@ -50,10 +50,11 @@ async def run_analysis(
     db: AsyncSession,
     settings: Settings,
     http_client: httpx.AsyncClient,
-    github: GitHubClient,
+    github: GitHubClient | None,
     changed_files: list[str],
     pr_labels: list[str],
     metrics: RunMetrics,
+    local_path: str | None = None,
 ) -> AnalysisResult:
     stage_started = time.perf_counter()
     await _do_transition(db, run, "CLASSIFYING")
@@ -84,6 +85,7 @@ async def run_analysis(
         run_kind=run.run_kind.value if hasattr(run.run_kind, "value") else "pr",
         pr_number=run.pr_number,
         base_sha=run.base_sha,
+        local_path=local_path,
     )
 
     registry = CollectorRegistry(collectors)

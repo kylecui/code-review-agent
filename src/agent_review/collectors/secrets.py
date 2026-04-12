@@ -14,6 +14,14 @@ class SecretsCollector(AbstractCollector):
 
     async def collect(self, context: CollectorContext) -> CollectorResult:
         started = time.perf_counter()
+        if context.github_client is None:
+            return CollectorResult(
+                collector_name=self.name,
+                status="skipped",
+                raw_findings=[],
+                duration_ms=self._duration_ms(started),
+                metadata={"reason": "no_github_client"},
+            )
         try:
             response = await context.github_client._request(
                 "GET",

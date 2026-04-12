@@ -47,6 +47,8 @@ class PipelineRunner:
                     self._settings.github_app_id,
                     self._settings.github_private_key.get_secret_value(),
                 )
+                if run.installation_id is None:
+                    raise RuntimeError("PR pipeline requires installation_id")
                 github = GitHubClient(self._http_client, auth, run.installation_id)
 
                 if await self._check_superseded(db, run):
