@@ -34,34 +34,108 @@
     <tr><th>Summary</th><td>{{ run.decision.summary }}</td></tr>
   </table>
 
-  {% if run.decision.blocking_findings %}
-  <h3 style="margin-top: 16px; font-size: 14px;">Blocking Findings</h3>
-  <ul style="margin: 8px 0 0 20px;">
-    {% for bf in run.decision.blocking_findings %}
-    <li class="mono" style="font-size: 13px;">
-      {% set parts = bf.split(':') %}
-      {% if parts | length >= 4 %}
-        {% set fpath = ':'.join(parts[2:-1]) %}
-        {% set fline = parts[-1] %}
-        <a href="https://github.com/{{ run.repo }}/blob/{{ run.head_sha }}/{{ fpath }}#L{{ fline }}" target="_blank" rel="noopener">{{ fpath }}:{{ fline }}</a>
-        <span style="color: var(--text-muted);"> — {{ parts[1] }}</span>
+  <div class="info-box">
+    <strong>ℹ️ How findings are classified:</strong><br>
+    <strong>Blocking</strong> — findings with HIGH or CRITICAL severity, <em>or</em> findings whose category matches a blocking pattern in the active policy (e.g. <code>security.*</code>, <code>quality.bug</code>). These must be addressed before merge.<br>
+    <strong>Advisory</strong> — all other findings (typically MEDIUM/LOW severity in non-blocking categories like <code>quality.static-analysis</code>). Informational only.
+  </div>
+
+  {% set ns = namespace(by_severity=0, by_policy=0) %}
+  {% for f in findings %}
+    {% if f.blocking %}
+      {% if f.severity.value in ['HIGH', 'CRITICAL'] %}
+        {% set ns.by_severity = ns.by_severity + 1 %}
       {% else %}
-        {{ bf }}
+        {% set ns.by_policy = ns.by_policy + 1 %}
       {% endif %}
-    </li>
+    {% endif %}
+  {% endfor %}
+
+  {% if run.decision.blocking_findings %}
+  <h3 style="margin-top: 16px; font-size: 14px;">
+    Blocking Findings ({{ ns.by_severity + ns.by_policy }})
+    <span style="font-weight: 400; color: var(--text-muted); font-size: 12px;">
+      — {{ ns.by_severity }} by severity (HIGH/CRITICAL), {{ ns.by_policy }} by policy (category match)
+    </span>
+  </h3>
+
+  {% set severity_ids = [] %}
+  {% for f in findings %}
+    {% if f.blocking and f.severity.value in ['HIGH', 'CRITICAL'] %}
+      {% set _ = severity_ids.append(f.finding_id) %}
+    {% endif %}
+  {% endfor %}
+
+  {% if severity_ids %}
+  <h4 style="margin-top: 12px; font-size: 13px; color: var(--red); font-weight: 600;">
+    Blocked by Severity ({{ severity_ids | length }})
+  </h4>
+  <ul style="margin: 6px 0 0 20px;">
+    {% for bf in run.decision.blocking_findings %}
+      {% if bf in severity_ids %}
+      <li class="mono" style="font-size: 13px; margin-bottom: 2px;">
+        {% set parts = bf.split(':') %}
+        {% if parts | length >= 4 %}
+          {% set fpath = ':'.join(parts[2:-1]) %}
+          {% set fline = parts[-1] %}
+          {% set f_sev = None %}
+          {% for f in findings if f.finding_id == bf %}{% set f_sev = f.severity.value %}{% endfor %}
+          <span class="badge badge-{{ f_sev or 'HIGH' }}" style="font-size: 10px; vertical-align: middle;">{{ f_sev or 'HIGH' }}</span>
+          <a href="https://github.com/{{ run.repo }}/blob/{{ run.head_sha }}/{{ fpath }}#L{{ fline }}" target="_blank" rel="noopener">{{ fpath }}:{{ fline }}</a>
+          <span style="color: var(--text-muted);"> — {{ parts[1] }}</span>
+        {% else %}
+          {{ bf }}
+        {% endif %}
+      </li>
+      {% endif %}
     {% endfor %}
   </ul>
   {% endif %}
 
+  {% set policy_count = (ns.by_severity + ns.by_policy) - severity_ids | length %}
+  {% if policy_count > 0 or ns.by_policy > 0 %}
+  <details style="margin-top: 12px;">
+    <summary style="font-size: 13px; font-weight: 600; color: var(--orange);">
+      Blocked by Policy — category matches <code>security.*</code> ({{ ns.by_policy }})
+      <span style="font-weight: 400; color: var(--text-muted);"> — click to expand</span>
+    </summary>
+    <ul style="margin: 6px 0 0 20px;">
+      {% for bf in run.decision.blocking_findings %}
+        {% if bf not in severity_ids %}
+        <li class="mono" style="font-size: 13px; margin-bottom: 2px;">
+          {% set parts = bf.split(':') %}
+          {% if parts | length >= 4 %}
+            {% set fpath = ':'.join(parts[2:-1]) %}
+            {% set fline = parts[-1] %}
+            <span class="badge badge-policy" style="font-size: 10px; vertical-align: middle;">POLICY</span>
+            <a href="https://github.com/{{ run.repo }}/blob/{{ run.head_sha }}/{{ fpath }}#L{{ fline }}" target="_blank" rel="noopener">{{ fpath }}:{{ fline }}</a>
+            <span style="color: var(--text-muted);"> — {{ parts[1] }}</span>
+          {% else %}
+            {{ bf }}
+          {% endif %}
+        </li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+  {% endif %}
+
   {% if run.decision.advisory_findings %}
-  <h3 style="margin-top: 16px; font-size: 14px;">Advisory Findings</h3>
+  <h3 style="margin-top: 16px; font-size: 14px;">
+    Advisory Findings ({{ run.decision.advisory_findings | length }})
+    <span style="font-weight: 400; color: var(--text-muted); font-size: 12px;">
+      — not matching any blocking criteria
+    </span>
+  </h3>
   <ul style="margin: 8px 0 0 20px;">
     {% for af in run.decision.advisory_findings %}
-    <li class="mono" style="font-size: 13px;">
+    <li class="mono" style="font-size: 13px; margin-bottom: 2px;">
       {% set parts = af.split(':') %}
       {% if parts | length >= 4 %}
         {% set fpath = ':'.join(parts[2:-1]) %}
         {% set fline = parts[-1] %}
+        <span class="badge badge-MEDIUM" style="font-size: 10px; vertical-align: middle;">MEDIUM</span>
         <a href="https://github.com/{{ run.repo }}/blob/{{ run.head_sha }}/{{ fpath }}#L{{ fline }}" target="_blank" rel="noopener">{{ fpath }}:{{ fline }}</a>
         <span style="color: var(--text-muted);"> — {{ parts[1] }}</span>
       {% else %}
@@ -117,7 +191,14 @@
       <a href="https://github.com/{{ run.repo }}/blob/{{ run.head_sha }}/{{ f.file_path }}#L{{ f.line_start }}" target="_blank" rel="noopener" class="mono">{{ f.file_path }}:{{ f.line_start }}</a>
       &middot; {{ f.category }}
       &middot; {{ ', '.join(f.source_tools) }}
-      {% if f.blocking %}&middot; <strong style="color: var(--red);">BLOCKING</strong>{% endif %}
+      {% if f.blocking %}
+        &middot;
+        {% if f.severity.value in ['HIGH', 'CRITICAL'] %}
+          <strong style="color: var(--red);">BLOCKING</strong> <span style="color: var(--text-muted); font-size: 11px;">(severity: {{ f.severity.value }})</span>
+        {% else %}
+          <strong style="color: var(--orange);">BLOCKING</strong> <span style="color: var(--text-muted); font-size: 11px;">(policy: {{ f.category }})</span>
+        {% endif %}
+      {% endif %}
     </div>
     {% if f.evidence %}
     <p><strong>Evidence:</strong></p>
