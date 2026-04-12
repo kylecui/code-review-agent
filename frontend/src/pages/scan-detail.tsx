@@ -31,7 +31,25 @@ function severityBadgeClass(severity: string) {
   return 'bg-zinc-100 text-zinc-700 border-zinc-200'
 }
 
-function FindingCard({ finding }: { finding: FindingRead }) {
+function buildGitHubUrl(repo: string, headSha: string, filePath: string, lineStart: number): string | null {
+  // Only build links for GitHub-hosted repos (owner/repo format, not local paths)
+  if (!repo.includes('/') || repo.startsWith('/')) return null
+  const lineFragment = lineStart > 0 ? `#L${lineStart}` : ''
+  return `https://github.com/${repo}/blob/${headSha}/${filePath}${lineFragment}`
+}
+
+interface FindingCardProps {
+  finding: FindingRead
+  repo: string
+  headSha: string
+}
+
+function FindingCard({ finding, repo, headSha }: FindingCardProps) {
+  const githubUrl = buildGitHubUrl(repo, headSha, finding.file_path, finding.line_start)
+  const locationText = finding.line_end
+    ? `${finding.file_path}:${finding.line_start}-${finding.line_end}`
+    : `${finding.file_path}:${finding.line_start}`
+
   return (
     <Card>
       <CardHeader>
@@ -45,7 +63,19 @@ function FindingCard({ finding }: { finding: FindingRead }) {
           <span className="font-medium">Category:</span> {finding.category}
         </p>
         <p>
-          <span className="font-medium">Location:</span> {finding.file_path}:{finding.line_start}
+          <span className="font-medium">Location:</span>{' '}
+          {githubUrl ? (
+            <a
+              href={githubUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-blue-600 underline underline-offset-2 hover:text-blue-800"
+            >
+              {locationText}
+            </a>
+          ) : (
+            <span className="font-mono">{locationText}</span>
+          )}
         </p>
         <p>
           <span className="font-medium">Source Tools:</span> {finding.source_tools.join(', ') || '—'}
@@ -162,7 +192,7 @@ export function ScanDetailPage({ scanId, isSuperuser, onBack }: ScanDetailPagePr
         <h3 className="text-lg font-semibold">Blocking Findings ({blocking.length})</h3>
         <div className="space-y-3">
           {blocking.map((finding) => (
-            <FindingCard key={finding.id} finding={finding} />
+            <FindingCard key={finding.id} finding={finding} repo={scan.repo} headSha={scan.head_sha} />
           ))}
           {blocking.length === 0 ? <p className="text-sm text-zinc-500">No blocking findings.</p> : null}
         </div>
@@ -172,7 +202,7 @@ export function ScanDetailPage({ scanId, isSuperuser, onBack }: ScanDetailPagePr
         <h3 className="text-lg font-semibold">Advisory Findings ({advisory.length})</h3>
         <div className="space-y-3">
           {advisory.map((finding) => (
-            <FindingCard key={finding.id} finding={finding} />
+            <FindingCard key={finding.id} finding={finding} repo={scan.repo} headSha={scan.head_sha} />
           ))}
           {advisory.length === 0 ? <p className="text-sm text-zinc-500">No advisory findings.</p> : null}
         </div>

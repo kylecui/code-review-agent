@@ -47,42 +47,55 @@ function kindBadgeClass(kind: string) {
 
 function TriggerScanDialog() {
   const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<'github' | 'local'>('github')
   const [repo, setRepo] = useState('')
   const [installationId, setInstallationId] = useState('')
   const [path, setPath] = useState('')
   const [error, setError] = useState<string | null>(null)
   const triggerScan = useTriggerScan()
 
+  const resetForm = () => {
+    setRepo('')
+    setInstallationId('')
+    setPath('')
+    setError(null)
+  }
+
   const handleSubmit: NonNullable<React.ComponentProps<'form'>['onSubmit']> = (event) => {
     event.preventDefault()
     setError(null)
 
-    triggerScan.mutate(
-      {
-        repo: repo || undefined,
-        installation_id: installationId ? Number(installationId) : undefined,
-        path: path || undefined,
-      },
-      {
-        onSuccess: () => {
-          setOpen(false)
-          setRepo('')
-          setInstallationId('')
-          setPath('')
-        },
-        onError: (mutationError) => {
-          if (mutationError instanceof Error) {
-            setError(mutationError.message)
-          } else {
-            setError('Failed to trigger scan')
+    const body =
+      mode === 'github'
+        ? {
+            repo: repo || undefined,
+            installation_id: installationId ? Number(installationId) : undefined,
           }
-        },
+        : { path: path || undefined }
+
+    triggerScan.mutate(body, {
+      onSuccess: () => {
+        setOpen(false)
+        resetForm()
       },
-    )
+      onError: (mutationError) => {
+        if (mutationError instanceof Error) {
+          setError(mutationError.message)
+        } else {
+          setError('Failed to trigger scan')
+        }
+      },
+    })
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        setOpen(value)
+        if (!value) resetForm()
+      }}
+    >
       <DialogTrigger className={cn(buttonVariants({ variant: 'default' }))}>
         Trigger Scan
       </DialogTrigger>
@@ -91,23 +104,79 @@ function TriggerScanDialog() {
           <DialogTitle>Trigger Scan</DialogTitle>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-1">
-            <label className="text-sm text-zinc-600">Repository</label>
-            <Input value={repo} onChange={(event) => setRepo(event.target.value)} placeholder="owner/repo" />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className={cn(
+                'flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors',
+                mode === 'github'
+                  ? 'border-zinc-900 bg-zinc-900 text-white'
+                  : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50',
+              )}
+              onClick={() => {
+                setMode('github')
+                setError(null)
+              }}
+            >
+              GitHub Repository
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors',
+                mode === 'local'
+                  ? 'border-zinc-900 bg-zinc-900 text-white'
+                  : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50',
+              )}
+              onClick={() => {
+                setMode('local')
+                setError(null)
+              }}
+            >
+              Local Directory
+            </button>
           </div>
-          <div className="space-y-1">
-            <label className="text-sm text-zinc-600">Installation ID</label>
-            <Input
-              value={installationId}
-              onChange={(event) => setInstallationId(event.target.value)}
-              placeholder="12345"
-              type="number"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm text-zinc-600">Local Path</label>
-            <Input value={path} onChange={(event) => setPath(event.target.value)} placeholder="/code/repo" />
-          </div>
+
+          {mode === 'github' ? (
+            <>
+              <p className="text-xs text-zinc-500">
+                Scan a GitHub repository via the GitHub API. Requires the GitHub App to be installed on the target repo.
+              </p>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-zinc-700">Repository</label>
+                <Input value={repo} onChange={(event) => setRepo(event.target.value)} placeholder="owner/repo" />
+                <p className="text-xs text-zinc-400">The full repository name, e.g. octocat/hello-world</p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-zinc-700">Installation ID</label>
+                <Input
+                  value={installationId}
+                  onChange={(event) => setInstallationId(event.target.value)}
+                  placeholder="123456"
+                  type="number"
+                />
+                <p className="text-xs text-zinc-400">
+                  The GitHub App installation ID. Find it in your GitHub App settings under Installations.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-zinc-500">
+                Scan a directory on the server's filesystem. The path must be accessible from within the running
+                container.
+              </p>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-zinc-700">Server Path</label>
+                <Input value={path} onChange={(event) => setPath(event.target.value)} placeholder="/opt/repos/myproject" />
+                <p className="text-xs text-zinc-400">
+                  Absolute path on the server (not your local machine). Mount directories into the container via Docker
+                  volumes if needed.
+                </p>
+              </div>
+            </>
+          )}
+
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
