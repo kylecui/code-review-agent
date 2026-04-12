@@ -1,4 +1,5 @@
 from ._base import Base
+from .app_config import AppConfig
 from .enums import (
     FailureMode,
     FindingConfidence,
@@ -14,6 +15,7 @@ from .review_run import InvalidTransition, ReviewRun
 from .user import User
 
 __all__ = [
+    "AppConfig",
     "Base",
     "FailureMode",
     "Finding",
