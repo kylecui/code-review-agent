@@ -32,6 +32,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     from agent_review.api.admin.policies import router as admin_policies_router
+    from agent_review.api.admin.scans import router as admin_scans_router
     from agent_review.api.admin.settings import router as admin_settings_router
     from agent_review.api.admin.users import router as admin_users_router
     from agent_review.api.auth import router as auth_router
@@ -46,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(admin_users_router, prefix="/api/admin/users")
     app.include_router(admin_settings_router, prefix="/api/admin/settings")
     app.include_router(admin_policies_router, prefix="/api/admin/policies")
+    app.include_router(admin_scans_router, prefix="/api/admin/scans")
     app.include_router(webhooks_router, prefix="/webhooks")
     app.include_router(web_router)
     return app
