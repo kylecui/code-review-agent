@@ -141,3 +141,33 @@ export function useDeleteScan() {
     },
   })
 }
+
+export function useExportReport() {
+  return useMutation({
+    mutationFn: async ({ scanId, format }: { scanId: string; format: 'markdown' | 'json' }) => {
+      const response = await fetch(`/api/admin/scans/${scanId}/report?format=${format}`, {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null)
+        const detail = body?.detail
+        throw new Error(typeof detail === 'string' ? detail : `Export failed (${response.status})`)
+      }
+
+      const disposition = response.headers.get('Content-Disposition') || ''
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/)
+      const filename = filenameMatch?.[1] || `report.${format === 'json' ? 'json' : 'md'}`
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    },
+  })
+}

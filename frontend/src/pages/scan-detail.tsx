@@ -1,9 +1,10 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useCancelScan, useDeleteScan, useScanDetail } from '@/hooks/use-scans'
+import { useCancelScan, useDeleteScan, useExportReport, useScanDetail } from '@/hooks/use-scans'
 import type { FindingRead } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useState } from 'react'
 
 interface ScanDetailPageProps {
   scanId: string
@@ -95,6 +96,8 @@ export function ScanDetailPage({ scanId, isSuperuser, onBack }: ScanDetailPagePr
   const query = useScanDetail(scanId)
   const cancelScan = useCancelScan()
   const deleteScan = useDeleteScan()
+  const exportReport = useExportReport()
+  const [showExportMenu, setShowExportMenu] = useState(false)
 
   if (query.isLoading) {
     return <p className="text-zinc-500">Loading scan detail…</p>
@@ -125,26 +128,64 @@ export function ScanDetailPage({ scanId, isSuperuser, onBack }: ScanDetailPagePr
           Back to Scans
         </Button>
 
-        {isSuperuser ? (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              disabled={!canCancel || cancelScan.isPending}
-              onClick={() => cancelScan.mutate(scan.id)}
-            >
-              {cancelScan.isPending ? 'Cancelling…' : 'Cancel'}
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={deleteScan.isPending}
-              onClick={() => {
-                deleteScan.mutate(scan.id, { onSuccess: onBack })
-              }}
-            >
-              {deleteScan.isPending ? 'Deleting…' : 'Delete'}
-            </Button>
-          </div>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {scan.state === 'completed' ? (
+            <div className="relative">
+              <Button
+                variant="outline"
+                disabled={exportReport.isPending}
+                onClick={() => setShowExportMenu((prev) => !prev)}
+              >
+                {exportReport.isPending ? 'Exporting…' : 'Export Report'}
+              </Button>
+              {showExportMenu ? (
+                <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-md border bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-100"
+                    onClick={() => {
+                      exportReport.mutate({ scanId: scan.id, format: 'markdown' })
+                      setShowExportMenu(false)
+                    }}
+                  >
+                    Markdown (.md)
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-100"
+                    onClick={() => {
+                      exportReport.mutate({ scanId: scan.id, format: 'json' })
+                      setShowExportMenu(false)
+                    }}
+                  >
+                    JSON (.json)
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {isSuperuser ? (
+            <>
+              <Button
+                variant="outline"
+                disabled={!canCancel || cancelScan.isPending}
+                onClick={() => cancelScan.mutate(scan.id)}
+              >
+                {cancelScan.isPending ? 'Cancelling…' : 'Cancel'}
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={deleteScan.isPending}
+                onClick={() => {
+                  deleteScan.mutate(scan.id, { onSuccess: onBack })
+                }}
+              >
+                {deleteScan.isPending ? 'Deleting…' : 'Delete'}
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <Card>

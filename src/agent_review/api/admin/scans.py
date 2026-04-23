@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import json as json_mod
 import shutil
 import tarfile
 import uuid
 import zipfile
 from pathlib import Path
-from typing import Annotated, Any, ClassVar
+from typing import Annotated, Any, ClassVar, Literal
 
 import httpx
 from fastapi import (
@@ -19,6 +20,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
@@ -27,6 +29,7 @@ from agent_review.auth.dependencies import get_current_superuser, get_current_us
 from agent_review.models import InvalidTransition, ReviewRun, ReviewState, RunKind, User
 from agent_review.pipeline.baseline_runner import BaselineRunner
 from agent_review.pipeline.local_runner import LocalBaselineRunner
+from agent_review.reporting.db_report import build_json_report, build_markdown_report
 from agent_review.schemas.finding import FindingRead
 from agent_review.schemas.review_run import ReviewRunRead
 
@@ -213,6 +216,50 @@ async def get_scan(
     return ScanDetailResponse(
         scan=ReviewRunRead.model_validate(scan),
         findings=[FindingRead.model_validate(finding) for finding in scan.findings],
+    )
+
+
+@router.get("/{scan_id}/report")
+async def export_report(
+    scan_id: uuid.UUID,
+    request: Request,
+    current_user: CurrentUser,
+    fmt: Literal["markdown", "json"] = Query(default="markdown", alias="format"),
+) -> Response:
+    _ = current_user
+    session_factory = request.app.state.session_factory
+
+    async with session_factory() as db:
+        result = await db.execute(
+            select(ReviewRun)
+            .options(selectinload(ReviewRun.findings))
+            .where(ReviewRun.id == scan_id)
+        )
+        scan = result.scalar_one_or_none()
+
+    if scan is None:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    scan_dict = ReviewRunRead.model_validate(scan).model_dump(mode="json")
+    findings_dicts = [FindingRead.model_validate(f).model_dump(mode="json") for f in scan.findings]
+
+    repo_slug = scan.repo.replace("/", "_")
+
+    if fmt == "json":
+        body = json_mod.dumps(build_json_report(scan_dict, findings_dicts), indent=2)
+        return Response(
+            content=body,
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="report_{repo_slug}_{scan_id}.json"'
+            },
+        )
+
+    body = build_markdown_report(scan_dict, findings_dicts)
+    return Response(
+        content=body,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="report_{repo_slug}_{scan_id}.md"'},
     )
 
 
