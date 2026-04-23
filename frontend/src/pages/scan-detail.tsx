@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useCancelScan, useDeleteScan, useExportReport, useScanDetail, useScanLogs } from '@/hooks/use-scans'
+import { useCancelScan, useDeleteScan, useExportReport, useRescan, useScanDetail, useScanLogs } from '@/hooks/use-scans'
 import type { LogEntry } from '@/hooks/use-scans'
 import type { FindingRead } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -173,7 +173,9 @@ export function ScanDetailPage({ scanId, isSuperuser, onBack }: ScanDetailPagePr
   const cancelScan = useCancelScan()
   const deleteScan = useDeleteScan()
   const exportReport = useExportReport()
+  const rescan = useRescan()
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showRescanMenu, setShowRescanMenu] = useState(false)
 
   if (query.isLoading) {
     return <p className="text-zinc-500">Loading scan detail…</p>
@@ -196,6 +198,8 @@ export function ScanDetailPage({ scanId, isSuperuser, onBack }: ScanDetailPagePr
   const canCancel = ['pending', 'classifying', 'collecting', 'normalizing', 'reasoning', 'deciding', 'publishing'].includes(
     scan.state,
   )
+  const isTerminal = ['completed', 'failed', 'superseded'].includes(scan.state)
+  const canRescan = isTerminal && !scan.repo.startsWith('upload/')
 
   return (
     <div className="space-y-6">
@@ -235,6 +239,44 @@ export function ScanDetailPage({ scanId, isSuperuser, onBack }: ScanDetailPagePr
                     }}
                   >
                     JSON (.json)
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {canRescan && isSuperuser ? (
+            <div className="relative">
+              <Button
+                variant="outline"
+                disabled={rescan.isPending}
+                onClick={() => setShowRescanMenu((prev) => !prev)}
+              >
+                {rescan.isPending ? 'Re-scanning…' : 'Re-scan'}
+              </Button>
+              {showRescanMenu ? (
+                <div className="absolute right-0 top-full z-10 mt-1 w-56 rounded-md border bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-100"
+                    onClick={() => {
+                      rescan.mutate({ scanId: scan.id, mode: 'fresh' }, { onSuccess: onBack })
+                      setShowRescanMenu(false)
+                    }}
+                  >
+                    <div className="font-medium">Fresh Scan (Latest HEAD)</div>
+                    <div className="text-xs text-zinc-500">Scan the repo's current default branch</div>
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-100"
+                    onClick={() => {
+                      rescan.mutate({ scanId: scan.id, mode: 'replay' }, { onSuccess: onBack })
+                      setShowRescanMenu(false)
+                    }}
+                  >
+                    <div className="font-medium">Exact Replay (Same SHA)</div>
+                    <div className="text-xs text-zinc-500">Re-run on the same commit: {scan.head_sha.slice(0, 8)}</div>
                   </button>
                 </div>
               ) : null}

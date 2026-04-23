@@ -71,6 +71,12 @@ class TriggerScanBody(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
 
+class RescanBody(BaseModel):
+    mode: Literal["fresh", "replay"] = "fresh"
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+
 def _parse_state_filter(raw_state: str | None) -> ReviewState | None:
     if raw_state is None:
         return None
@@ -443,6 +449,73 @@ async def cancel_scan(
         await db.refresh(scan)
 
     return ReviewRunRead.model_validate(scan)
+
+
+@router.post(
+    "/{scan_id}/rescan", response_model=ReviewRunRead, status_code=status.HTTP_202_ACCEPTED
+)
+async def rescan(
+    scan_id: uuid.UUID,
+    body: RescanBody,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current_user: CurrentSuperuser,
+) -> ReviewRunRead:
+    _ = current_user
+    session_factory = request.app.state.session_factory
+    settings = request.app.state.settings
+
+    async with session_factory() as db:
+        original = await db.get(ReviewRun, scan_id)
+        if original is None:
+            raise HTTPException(status_code=404, detail="Scan not found")
+
+    if original.repo.startswith("upload/") and original.installation_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Upload-based scans cannot be re-scanned. Please re-upload the archive.",
+        )
+
+    if original.installation_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot re-scan: no GitHub installation_id associated with this scan.",
+        )
+
+    if body.mode == "fresh":
+        from agent_review.scm.github_auth import GitHubAppAuth
+        from agent_review.scm.github_client import GitHubClient
+
+        auth = GitHubAppAuth(
+            settings.github_app_id,
+            settings.github_private_key.get_secret_value(),
+        )
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            github = GitHubClient(http_client, auth, original.installation_id)
+            default_branch = await github.get_default_branch(original.repo)
+            head_sha = await github.get_branch_sha(original.repo, default_branch)
+    else:
+        head_sha = original.head_sha
+
+    new_run = ReviewRun(
+        id=uuid.uuid4(),
+        repo=original.repo,
+        run_kind=original.run_kind,
+        pr_number=original.pr_number,
+        head_sha=head_sha,
+        base_sha=original.base_sha,
+        installation_id=original.installation_id,
+        state=ReviewState.PENDING,
+    )
+
+    async with session_factory() as db:
+        db.add(new_run)
+        await db.commit()
+        await db.refresh(new_run)
+        run_id = str(new_run.id)
+
+    background_tasks.add_task(_run_github_baseline, request, run_id)
+    return ReviewRunRead.model_validate(new_run)
 
 
 @router.delete("/{scan_id}", response_model=ReviewRunRead)

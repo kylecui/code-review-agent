@@ -142,6 +142,32 @@ export function useDeleteScan() {
   })
 }
 
+export function useRescan() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ scanId, mode }: { scanId: string; mode: 'fresh' | 'replay' }) => {
+      const response = await fetch(`/api/admin/scans/${scanId}/rescan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ mode }),
+      })
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null)
+        const detail = body?.detail
+        throw new Error(typeof detail === 'string' ? detail : `Re-scan failed (${response.status})`)
+      }
+
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scans'] })
+    },
+  })
+}
+
 export function useExportReport() {
   return useMutation({
     mutationFn: async ({ scanId, format }: { scanId: string; format: 'markdown' | 'json' }) => {
