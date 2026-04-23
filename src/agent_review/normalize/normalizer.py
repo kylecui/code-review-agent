@@ -89,8 +89,12 @@ class FindingsNormalizer:
             if snippet:
                 evidence.append(snippet)
             cwe = raw.get("cwe")
+            cwe_tag = ""
             if isinstance(cwe, list) and cwe:
                 evidence.append("CWE: " + ", ".join(str(c) for c in cwe))
+                cwe_tag = " (" + ", ".join(str(c) for c in cwe) + ")"
+
+            impact = self._derive_semgrep_impact(category, rule_id, cwe_tag)
 
             findings.append(
                 FindingCreate(
@@ -106,11 +110,8 @@ class FindingsNormalizer:
                     rule_id=rule_id,
                     title=f"Semgrep: {rule_id}",
                     evidence=evidence,
-                    impact="Potential security or code quality issue detected by static analysis.",
-                    fix_recommendation=(
-                        "Review the flagged code path and apply the corresponding "
-                        "secure coding fix."
-                    ),
+                    impact=impact,
+                    fix_recommendation=message,
                     fingerprint=fingerprint,
                 )
             )
@@ -132,10 +133,13 @@ class FindingsNormalizer:
             finding_id = f"sonar:{key}"
             fingerprint = self._fingerprint(f"sonar|{rule}|{component}|{line}")
 
+            sonar_category = self._sonar_category(issue_type)
+            impact = self._derive_sonar_impact(sonar_category, rule)
+
             findings.append(
                 FindingCreate(
                     finding_id=finding_id,
-                    category=self._sonar_category(issue_type),
+                    category=sonar_category,
                     severity=severity,
                     confidence=FindingConfidence.MEDIUM,
                     blocking=self._is_blocking(severity),
@@ -146,13 +150,8 @@ class FindingsNormalizer:
                     rule_id=rule,
                     title=f"Sonar: {rule}",
                     evidence=[message],
-                    impact=(
-                        "Potential maintainability, reliability, or security risk "
-                        "identified by Sonar."
-                    ),
-                    fix_recommendation=(
-                        "Address the Sonar issue by applying the recommended rule-compliant change."
-                    ),
+                    impact=impact,
+                    fix_recommendation=message,
                     fingerprint=fingerprint,
                 )
             )
@@ -179,6 +178,8 @@ class FindingsNormalizer:
                 f"github_ci|{check_name}|{path}|{start_line}|{end_line_value}|{title}"
             )
 
+            ci_impact = f"CI check '{check_name}' reported a {annotation_level}-level issue."
+
             findings.append(
                 FindingCreate(
                     finding_id=finding_id,
@@ -193,13 +194,8 @@ class FindingsNormalizer:
                     rule_id=check_name,
                     title=title,
                     evidence=[message],
-                    impact=(
-                        "CI checks detected an issue that may affect build correctness or quality."
-                    ),
-                    fix_recommendation=(
-                        "Investigate the related check output and update the code "
-                        "or configuration accordingly."
-                    ),
+                    impact=ci_impact,
+                    fix_recommendation=message,
                     fingerprint=fingerprint,
                 )
             )
@@ -275,6 +271,33 @@ class FindingsNormalizer:
             "CODE_SMELL": "quality.code-smell",
         }
         return mapping.get(issue_type, "quality.issue")
+
+    @staticmethod
+    def _derive_semgrep_impact(category: str, rule_id: str, cwe_tag: str) -> str:
+        lowered = rule_id.lower()
+        if category.startswith("security"):
+            # Extract the vulnerability type from the rule_id path
+            # e.g. "python.django.security.injection.sql-injection" -> "sql-injection"
+            parts = lowered.split(".")
+            vuln_type = parts[-1] if parts else lowered
+            vuln_readable = vuln_type.replace("-", " ").replace("_", " ")
+            return (
+                f"Security risk: {vuln_readable} vulnerability detected by rule "
+                f"'{rule_id}'{cwe_tag}."
+            )
+        if "bug" in category or "correctness" in category:
+            return f"Potential bug detected by rule '{rule_id}'."
+        return f"Code quality issue detected by rule '{rule_id}'."
+
+    @staticmethod
+    def _derive_sonar_impact(sonar_category: str, rule: str) -> str:
+        if "vulnerability" in sonar_category:
+            return f"Security vulnerability identified by Sonar rule '{rule}'."
+        if "bug" in sonar_category:
+            return f"Potential bug identified by Sonar rule '{rule}'."
+        if "code-smell" in sonar_category:
+            return f"Maintainability issue (code smell) identified by Sonar rule '{rule}'."
+        return f"Code quality issue identified by Sonar rule '{rule}'."
 
     @staticmethod
     def _is_blocking(severity: FindingSeverity) -> bool:

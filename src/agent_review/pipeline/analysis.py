@@ -213,12 +213,35 @@ async def run_analysis(
     metrics.reasoning_ms = int((time.perf_counter() - stage_started) * 1000)
     metrics.llm_cost_cents = synthesis.cost_cents
     metrics.is_degraded = synthesis.is_degraded
+
+    enriched_count = 0
+    if not synthesis.is_degraded and synthesis.prioritized_findings:
+        fix_map: dict[str, str] = {}
+        for pf in synthesis.prioritized_findings:
+            if pf.suggested_fix and pf.finding_id:
+                fix_map[pf.finding_id] = pf.suggested_fix
+        if fix_map:
+            db_findings_result = await db.execute(
+                select(Finding).where(
+                    Finding.review_run_id == run.id,
+                    Finding.finding_id.in_(fix_map.keys()),
+                )
+            )
+            for db_finding in db_findings_result.scalars().all():
+                llm_fix = fix_map.get(db_finding.finding_id, "")
+                if llm_fix:
+                    db_finding.fix_recommendation = llm_fix
+                    enriched_count += 1
+            if enriched_count:
+                await db.commit()
+
     if plog:
         plog.stage_end(
             "REASONING",
             model_used=synthesis.model_used,
             cost_cents=synthesis.cost_cents,
             is_degraded=synthesis.is_degraded,
+            enriched_findings=enriched_count,
         )
 
     stage_started = time.perf_counter()
