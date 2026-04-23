@@ -87,6 +87,8 @@ class FindingsNormalizer:
                 findings.extend(self._normalize_roslyn(result))
             elif result.collector_name == "luacheck":
                 findings.extend(self._normalize_luacheck(result))
+            elif result.collector_name == "codeql":
+                findings.extend(self._normalize_codeql(result))
         return findings
 
     def _normalize_semgrep(self, result: CollectorResult) -> list[FindingCreate]:
@@ -466,6 +468,9 @@ class FindingsNormalizer:
 
     def _normalize_roslyn(self, result: CollectorResult) -> list[FindingCreate]:
         return self._normalize_sarif_based(result, "Roslyn", "quality.static-analysis")
+
+    def _normalize_codeql(self, result: CollectorResult) -> list[FindingCreate]:
+        return self._normalize_sarif_based(result, "CodeQL", "security.sast")
 
     def _normalize_luacheck(self, result: CollectorResult) -> list[FindingCreate]:
         findings: list[FindingCreate] = []

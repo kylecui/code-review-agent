@@ -11,6 +11,7 @@ def _finding(
     severity: FindingSeverity,
     source_tool: str,
     evidence: list[str],
+    fingerprint_v2: str | None = None,
 ) -> FindingCreate:
     return FindingCreate(
         finding_id=finding_id,
@@ -26,6 +27,7 @@ def _finding(
         impact="impact",
         fix_recommendation="fix",
         fingerprint=fingerprint,
+        fingerprint_v2=fingerprint_v2,
     )
 
 
@@ -59,3 +61,52 @@ def test_deduplicate_sorts_by_severity_desc() -> None:
         FindingSeverity.MEDIUM,
         FindingSeverity.INFO,
     ]
+
+
+def test_deduplicate_groups_by_fingerprint_v2_when_present() -> None:
+    dedup = FindingsDeduplicator()
+    findings = [
+        _finding(
+            "a", "fp-old-1", FindingSeverity.MEDIUM, "semgrep", ["e1"], fingerprint_v2="fp-v2-1"
+        ),
+        _finding(
+            "b", "fp-old-2", FindingSeverity.HIGH, "spotbugs", ["e2"], fingerprint_v2="fp-v2-1"
+        ),
+        _finding("c", "fp-old-3", FindingSeverity.LOW, "sonar", ["e3"]),
+    ]
+
+    out = dedup.deduplicate(findings)
+
+    assert len(out) == 2
+    merged = next(f for f in out if f.severity == FindingSeverity.HIGH)
+    assert sorted(merged.source_tools) == ["semgrep", "spotbugs"]
+    assert sorted(merged.evidence) == ["e1", "e2"]
+
+
+def test_deduplicate_v2_takes_priority_over_v1() -> None:
+    """Two findings share fingerprint but have different fingerprint_v2 → NOT merged."""
+    dedup = FindingsDeduplicator()
+    findings = [
+        _finding("a", "fp-same", FindingSeverity.MEDIUM, "semgrep", ["e1"], fingerprint_v2="v2-a"),
+        _finding("b", "fp-same", FindingSeverity.HIGH, "sonar", ["e2"], fingerprint_v2="v2-b"),
+    ]
+
+    out = dedup.deduplicate(findings)
+
+    assert len(out) == 2
+
+
+def test_deduplicate_mixed_v1_and_v2_fingerprints() -> None:
+    """Findings without v2 fall back to v1 grouping."""
+    dedup = FindingsDeduplicator()
+    findings = [
+        _finding("a", "fp-1", FindingSeverity.MEDIUM, "semgrep", ["e1"]),
+        _finding("b", "fp-1", FindingSeverity.LOW, "sonar", ["e2"]),
+        _finding("c", "fp-2", FindingSeverity.HIGH, "gitleaks", ["e3"], fingerprint_v2="fp-v2-x"),
+    ]
+
+    out = dedup.deduplicate(findings)
+
+    assert len(out) == 2
+    v1_merged = next(f for f in out if f.finding_id in ("a", "b"))
+    assert sorted(v1_merged.source_tools) == ["semgrep", "sonar"]

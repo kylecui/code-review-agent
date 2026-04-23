@@ -341,3 +341,59 @@ def test_normalize_mixed_old_and_new_collectors() -> None:
     assert len(findings) == 4
     tool_sources = {f.source_tools[0] for f in findings}
     assert tool_sources == {"semgrep", "gitleaks", "cppcheck", "luacheck"}
+
+
+def test_normalize_codeql_uses_sarif_based_with_security_default() -> None:
+    normalizer = FindingsNormalizer()
+    findings = normalizer.normalize(
+        [
+            _result(
+                "codeql",
+                [
+                    {
+                        "rule_id": "py/sql-injection",
+                        "path": "app/db.py",
+                        "line": 42,
+                        "end_line": 42,
+                        "severity": "ERROR",
+                        "message": "Potential SQL injection",
+                        "snippet": "cursor.execute(query)",
+                        "cwe": ["CWE-89"],
+                        "precision": "high",
+                        "category": "security",
+                    }
+                ],
+            )
+        ]
+    )
+    assert len(findings) == 1
+    f = findings[0]
+    assert f.source_tools == ["codeql"]
+    assert f.category == "security.sast"
+    assert f.title == "CodeQL: py/sql-injection"
+    assert f.file_path == "app/db.py"
+    assert f.line_start == 42
+    assert "CWE-89" in " ".join(f.evidence)
+
+
+def test_normalize_codeql_unknown_category_defaults_to_security_sast() -> None:
+    normalizer = FindingsNormalizer()
+    findings = normalizer.normalize(
+        [
+            _result(
+                "codeql",
+                [
+                    {
+                        "rule_id": "py/unused-import",
+                        "path": "lib/utils.py",
+                        "line": 1,
+                        "severity": "WARNING",
+                        "message": "Unused import",
+                        "category": "",
+                    }
+                ],
+            )
+        ]
+    )
+    assert len(findings) == 1
+    assert findings[0].category == "security.sast"

@@ -21,7 +21,8 @@ class FindingsDeduplicator:
     def deduplicate(self, findings: list[FindingCreate]) -> list[FindingCreate]:
         grouped: dict[str, list[FindingCreate]] = defaultdict(list)
         for finding in findings:
-            grouped[finding.fingerprint].append(finding)
+            key = finding.fingerprint_v2 if finding.fingerprint_v2 else finding.fingerprint
+            grouped[key].append(finding)
 
         deduplicated: list[FindingCreate] = []
         for group in grouped.values():
