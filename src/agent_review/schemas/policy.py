@@ -27,9 +27,23 @@ class ExceptionsConfig(BaseModel):
     emergency_bypass_labels: list[str] = Field(default_factory=list)
 
 
+class EngineTierConfig(BaseModel):
+    l1_enabled: bool = True
+    l2_enabled: bool = True
+    l3_enabled: bool = False
+
+
+class ScanTrackConfig(BaseModel):
+    incremental: EngineTierConfig = Field(
+        default_factory=lambda: EngineTierConfig(l3_enabled=False)
+    )
+    baseline: EngineTierConfig = Field(default_factory=lambda: EngineTierConfig(l3_enabled=True))
+
+
 class PolicyConfig(BaseModel):
     version: int = 1
     collectors: dict[str, CollectorPolicyConfig] = Field(default_factory=dict)
     profiles: dict[str, ProfilePolicyConfig] = Field(default_factory=dict)
     limits: LimitsConfig = Field(default_factory=LimitsConfig)
     exceptions: ExceptionsConfig = Field(default_factory=ExceptionsConfig)
+    engine_tiers: ScanTrackConfig = Field(default_factory=ScanTrackConfig)

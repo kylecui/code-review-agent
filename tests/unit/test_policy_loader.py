@@ -65,6 +65,10 @@ def test_falls_back_to_default_config_when_files_missing(tmp_path: Path) -> None
             "max_diff_lines": 10000,
         },
         "exceptions": {"emergency_bypass_labels": []},
+        "engine_tiers": {
+            "incremental": {"l1_enabled": True, "l2_enabled": True, "l3_enabled": False},
+            "baseline": {"l1_enabled": True, "l2_enabled": True, "l3_enabled": True},
+        },
     }
 
 
