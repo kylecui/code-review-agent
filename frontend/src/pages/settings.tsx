@@ -4,20 +4,48 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { useResetSetting, useSettings, useUpdateSettings } from '@/hooks/use-settings'
+import { Select } from '@/components/ui/select'
+import { useAvailableModels, useResetSetting, useSettings, useUpdateSettings } from '@/hooks/use-settings'
 
 type SettingItem = {
   key: string
   label: string
 }
 
+const SECRET_KEYS = new Set([
+  'llm_openai_api_key',
+  'llm_gemini_api_key',
+  'llm_github_api_key',
+  'llm_anthropic_api_key',
+])
+
+const MODEL_KEYS = new Set([
+  'llm_classify_model',
+  'llm_synthesize_model',
+  'llm_fallback_model',
+])
+
 const sections: Array<{ title: string; items: SettingItem[] }> = [
   {
-    title: 'LLM Configuration',
+    title: 'LLM API Keys',
+    items: [
+      { key: 'llm_openai_api_key', label: 'OpenAI API Key' },
+      { key: 'llm_gemini_api_key', label: 'Google Gemini API Key' },
+      { key: 'llm_github_api_key', label: 'GitHub Models API Key' },
+      { key: 'llm_anthropic_api_key', label: 'Anthropic API Key' },
+    ],
+  },
+  {
+    title: 'LLM Model Selection',
     items: [
       { key: 'llm_classify_model', label: 'Classify Model' },
       { key: 'llm_synthesize_model', label: 'Synthesize Model' },
       { key: 'llm_fallback_model', label: 'Fallback Model' },
+    ],
+  },
+  {
+    title: 'LLM Parameters',
+    items: [
       { key: 'llm_max_tokens', label: 'Max Tokens' },
       { key: 'llm_temperature', label: 'Temperature' },
       { key: 'llm_cost_budget_per_run_cents', label: 'Cost Budget per Run (cents)' },
@@ -53,13 +81,28 @@ export function SettingsPage() {
   const settingsQuery = useSettings()
   const updateSettings = useUpdateSettings()
   const resetSetting = useResetSetting()
+  const modelsQuery = useAvailableModels()
   const [draftValues, setDraftValues] = useState<Record<string, string>>({})
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const settings = settingsQuery.data ?? {}
 
+  const allModels = useMemo(() => {
+    if (!modelsQuery.data) return []
+    const models: Array<{ provider: string; model: string }> = []
+    for (const [provider, info] of Object.entries(modelsQuery.data)) {
+      if (info.available && info.models) {
+        for (const m of info.models) {
+          models.push({ provider, model: m })
+        }
+      }
+    }
+    return models
+  }, [modelsQuery.data])
+
   const hasChanges = useMemo(() => {
     return Object.entries(draftValues).some(([key, value]) => {
+      if (SECRET_KEYS.has(key)) return value.length > 0
       const current = settings[key]?.value
       return String(current ?? '') !== value
     })
@@ -74,6 +117,10 @@ export function SettingsPage() {
 
     const payload: Record<string, unknown> = {}
     Object.entries(draftValues).forEach(([key, value]) => {
+      if (SECRET_KEYS.has(key)) {
+        if (value.length > 0) payload[key] = value
+        return
+      }
       const original = settings[key]?.value
       if (String(original ?? '') !== value) {
         if (typeof original === 'number') {
@@ -140,9 +187,45 @@ export function SettingsPage() {
                     <p className="text-xs text-zinc-500">{item.key}</p>
                   </div>
 
-                  <Input value={value} onChange={(event) => setDraft(item.key, event.target.value)} />
+                  {SECRET_KEYS.has(item.key) ? (
+                    <Input
+                      type="password"
+                      placeholder={setting?.is_set ? '••••••••' : 'Not configured'}
+                      value={draftValues[item.key] ?? ''}
+                      onChange={(event) => setDraft(item.key, event.target.value)}
+                    />
+                  ) : MODEL_KEYS.has(item.key) ? (
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={draftValues[item.key] ?? String(setting?.value ?? '')}
+                        onChange={(event) => setDraft(item.key, event.target.value)}
+                      >
+                        <option value={String(setting?.value ?? '')}>
+                          {String(setting?.value ?? '(none)')}
+                        </option>
+                        {allModels
+                          .filter((m) => m.model !== String(setting?.value ?? ''))
+                          .map((m) => (
+                            <option key={m.model} value={m.model}>
+                              {m.model}
+                            </option>
+                          ))}
+                      </Select>
+                      {modelsQuery.isLoading && (
+                        <span className="text-xs text-zinc-400">Loading models…</span>
+                      )}
+                    </div>
+                  ) : (
+                    <Input value={value} onChange={(event) => setDraft(item.key, event.target.value)} />
+                  )}
 
-                  <Badge className={sourceBadgeClass(source)}>{source}</Badge>
+                  {SECRET_KEYS.has(item.key) ? (
+                    <Badge className={setting?.is_set ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-zinc-100 text-zinc-500 border-zinc-200'}>
+                      {setting?.is_set ? 'Configured' : 'Not Set'}
+                    </Badge>
+                  ) : (
+                    <Badge className={sourceBadgeClass(source)}>{source}</Badge>
+                  )}
 
                   <Button
                     variant="outline"

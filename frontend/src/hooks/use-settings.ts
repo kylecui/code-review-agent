@@ -7,7 +7,7 @@ import {
   updateSettingsApiAdminSettingsPut,
 } from '@/lib/api'
 
-type SettingsRecord = Record<string, { value: unknown; source: 'env' | 'db' | string }>
+type SettingsRecord = Record<string, { value: unknown; source: 'env' | 'db' | string; is_set?: boolean }>
 
 function normalizeError(error: unknown, fallback: string) {
   if (typeof error === 'object' && error !== null && 'detail' in error) {
@@ -44,6 +44,30 @@ export function useUpdateSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] })
     },
+  })
+}
+
+type ProviderModels = {
+  available: boolean
+  models?: string[]
+  error?: string
+}
+type ModelsResponse = {
+  providers: Record<string, ProviderModels>
+}
+
+export function useAvailableModels() {
+  return useQuery({
+    queryKey: ['settings-models'],
+    queryFn: async () => {
+      const resp = await fetch('/api/admin/settings/models', {
+        credentials: 'include',
+      })
+      if (!resp.ok) throw new Error('Failed to load models')
+      const data: ModelsResponse = await resp.json()
+      return data.providers ?? {}
+    },
+    staleTime: 60_000,
   })
 }
 

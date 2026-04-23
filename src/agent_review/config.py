@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     llm_classify_model: str = "gpt-4o-mini"
     llm_synthesize_model: str = "gpt-4o"
     llm_fallback_model: str = "gpt-4o-mini"
+    llm_openai_api_key: SecretStr = SecretStr("")
+    llm_gemini_api_key: SecretStr = SecretStr("")
+    llm_github_api_key: SecretStr = SecretStr("")
+    llm_anthropic_api_key: SecretStr = SecretStr("")
     llm_max_tokens: int = 4096
     llm_temperature: float = 1.0
     llm_cost_budget_per_run_cents: int = 50

@@ -5,6 +5,9 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from pydantic import SecretStr
+from sqlalchemy import select
+
 from agent_review.classifier.classifier import Classifier
 from agent_review.collectors.base import AbstractCollector, CollectorContext
 from agent_review.collectors.github_ci import GitHubCICollector
@@ -12,8 +15,10 @@ from agent_review.collectors.registry import CollectorRegistry
 from agent_review.collectors.secrets import SecretsCollector
 from agent_review.collectors.semgrep import SemgrepCollector
 from agent_review.collectors.sonar import SonarCollector
+from agent_review.crypto import decrypt_value
 from agent_review.gate import GateController, PolicyLoader
 from agent_review.models import Finding
+from agent_review.models.app_config import AppConfig
 from agent_review.normalize import FindingsDeduplicator, FindingsNormalizer
 from agent_review.reasoning import LLMClient, PromptManager, Synthesizer
 
@@ -140,7 +145,30 @@ async def run_analysis(
     stage_started = time.perf_counter()
     await _do_transition(db, run, "REASONING")
 
-    llm_client = LLMClient(settings)
+    api_keys: dict[str, str] = {}
+    secret = settings.secret_key.get_secret_value()
+    key_names = [
+        "llm_openai_api_key",
+        "llm_gemini_api_key",
+        "llm_github_api_key",
+        "llm_anthropic_api_key",
+    ]
+    result = await db.execute(select(AppConfig).where(AppConfig.key.in_(key_names)))
+    overrides = {r.key: r for r in result.scalars().all()}
+    for k in key_names:
+        override = overrides.get(k)
+        if override is not None:
+            import json
+
+            decrypted = decrypt_value(json.loads(override.value), secret)
+            if decrypted:
+                api_keys[k] = decrypted
+                continue
+        env_val = getattr(settings, k, None)
+        if isinstance(env_val, SecretStr) and env_val.get_secret_value():
+            api_keys[k] = env_val.get_secret_value()
+
+    llm_client = LLMClient(settings, api_keys=api_keys)
     prompt_manager = PromptManager(settings.prompts_dir)
     synthesizer = Synthesizer(llm_client, prompt_manager, settings)
     synthesis = await synthesizer.synthesize(findings, ctx)

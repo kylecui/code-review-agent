@@ -29,9 +29,21 @@ class LLMResponse:
 
 
 class LLMClient:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, api_keys: dict[str, str] | None = None):
         self._settings = settings
         self._total_cost_cents: float = 0.0
+        self._api_keys = api_keys or {}
+
+    def _resolve_api_key(self, model: str) -> str | None:
+        """Resolve API key for model based on prefix."""
+        model_lower = model.lower()
+        if model_lower.startswith("gemini/"):
+            return self._api_keys.get("llm_gemini_api_key") or None
+        if model_lower.startswith("github/"):
+            return self._api_keys.get("llm_github_api_key") or None
+        if model_lower.startswith("anthropic/") or model_lower.startswith("claude"):
+            return self._api_keys.get("llm_anthropic_api_key") or None
+        return self._api_keys.get("llm_openai_api_key") or None
 
     async def complete(
         self,
@@ -49,12 +61,16 @@ class LLMClient:
 
         started = time.perf_counter()
         try:
-            response: Any = await litellm.acompletion(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
+            api_key = self._resolve_api_key(model)
+            kwargs: dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+            if api_key:
+                kwargs["api_key"] = api_key
+            response: Any = await litellm.acompletion(**kwargs)
         except Exception as exc:
             raise LLMError(f"LLM completion failed: {exc}") from exc
 
