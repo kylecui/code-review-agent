@@ -216,6 +216,7 @@ class SemgrepCollector(AbstractCollector):
         ".sol": ["solidity"],
         ".sh": ["bash"],
         ".bash": ["bash"],
+        ".lua": ["generic"],
         ".tf": ["terraform"],
         ".hcl": ["terraform"],
         ".html": ["html"],
