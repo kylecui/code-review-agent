@@ -49,6 +49,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from agent_review.api.auth import router as auth_router
     from agent_review.api.health import router as health_router
     from agent_review.api.scan import router as scan_router
+    from agent_review.api.user.repositories import router as user_repositories_router
+    from agent_review.api.user.settings import router as user_settings_router
     from agent_review.api.webhooks import router as webhooks_router
 
     app.include_router(health_router)
@@ -58,6 +60,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(admin_settings_router, prefix="/api/admin/settings")
     app.include_router(admin_policies_router, prefix="/api/admin/policies")
     app.include_router(admin_scans_router, prefix="/api/admin/scans")
+    app.include_router(user_settings_router, prefix="/api/user/settings")
+    app.include_router(user_repositories_router, prefix="/api/user/repositories")
     app.include_router(webhooks_router, prefix="/webhooks")
 
     frontend_dir = settings.frontend_dir
