@@ -53,3 +53,48 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"
+
+    # --- v0.2.0: New collector settings (all disabled by default) ---
+
+    # L1 - Gitleaks (secret scanning)
+    gitleaks_mode: Literal["cli", "disabled"] = "disabled"
+    gitleaks_config_path: str = ""
+
+    # L2 - SpotBugs (Java bytecode analysis)
+    spotbugs_mode: Literal["cli", "disabled"] = "disabled"
+    spotbugs_path: str = "/opt/spotbugs/bin/spotbugs"
+    spotbugs_findsecbugs_plugin: str = "/opt/findsecbugs-plugin.jar"
+    spotbugs_effort: Literal["min", "default", "max"] = "max"
+
+    # L2 - golangci-lint (Go)
+    golangci_lint_mode: Literal["cli", "disabled"] = "disabled"
+    golangci_lint_config_path: str = ""
+    golangci_lint_timeout: int = 300
+
+    # L2 - Cppcheck (C/C++)
+    cppcheck_mode: Literal["cli", "disabled"] = "disabled"
+    cppcheck_enable: str = "all"
+    cppcheck_suppressions: list[str] = ["missingIncludeSystem"]
+
+    # L2 - Clang-Tidy (C/C++)
+    clang_tidy_mode: Literal["cli", "disabled"] = "disabled"
+    clang_tidy_checks: str = "clang-analyzer-*,cert-*,bugprone-*"
+
+    # L2 - ESLint Security (JS/TS)
+    eslint_security_mode: Literal["cli", "disabled"] = "disabled"
+    eslint_security_config_path: str = "/opt/eslint-security.config.mjs"
+
+    # L2 - Roslyn (C#)
+    roslyn_mode: Literal["cli", "disabled"] = "disabled"
+    roslyn_severity: str = "info"
+
+    # L2 - Luacheck (Lua)
+    luacheck_mode: Literal["cli", "disabled"] = "disabled"
+    luacheck_config_path: str = ""
+
+    # L3 - CodeQL (graph-based taint analysis)
+    codeql_mode: Literal["cli", "disabled"] = "disabled"
+    codeql_path: str = "/opt/codeql/codeql"
+    codeql_threads: int = 0
+    codeql_ram: int = 8192
+    codeql_timeout: int = 1800
