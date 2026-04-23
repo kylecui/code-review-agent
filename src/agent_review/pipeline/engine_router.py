@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Literal
 
-from pydantic import BaseModel, Field
+from agent_review.schemas.policy import EngineTierConfig, ScanTrackConfig
 
 # Language detection
 EXTENSION_TO_LANGUAGE: dict[str, str] = {
@@ -45,25 +45,6 @@ def detect_languages(file_paths: list[str]) -> set[str]:
         if lang:
             languages.add(lang)
     return languages
-
-
-# Policy models for engine tiers.
-# These will also live in schemas/policy.py, but we define them here for self-containment.
-class EngineTierConfig(BaseModel):
-    """Configure which engine tiers are active per scan track."""
-
-    l1_enabled: bool = True
-    l2_enabled: bool = True
-    l3_enabled: bool = False
-
-
-class ScanTrackConfig(BaseModel):
-    """Per-track engine configuration."""
-
-    incremental: EngineTierConfig = Field(
-        default_factory=lambda: EngineTierConfig(l3_enabled=False)
-    )
-    baseline: EngineTierConfig = Field(default_factory=lambda: EngineTierConfig(l3_enabled=True))
 
 
 @dataclass(slots=True)

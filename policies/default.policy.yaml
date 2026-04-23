@@ -16,6 +16,47 @@ collectors:
     failure_mode: degraded
     timeout_seconds: 120
     retries: 0
+  gitleaks:
+    failure_mode: degraded
+    timeout_seconds: 120
+    retries: 0
+  spotbugs:
+    failure_mode: optional
+    timeout_seconds: 300
+    retries: 0
+  golangci_lint:
+    failure_mode: optional
+    timeout_seconds: 300
+    retries: 0
+  cppcheck:
+    failure_mode: optional
+    timeout_seconds: 300
+    retries: 0
+  eslint_security:
+    failure_mode: optional
+    timeout_seconds: 120
+    retries: 0
+  roslyn:
+    failure_mode: optional
+    timeout_seconds: 300
+    retries: 0
+  luacheck:
+    failure_mode: optional
+    timeout_seconds: 120
+    retries: 0
+  codeql:
+    failure_mode: optional
+    timeout_seconds: 1800
+    retries: 0
+engine_tiers:
+  incremental:
+    l1_enabled: true
+    l2_enabled: true
+    l3_enabled: false
+  baseline:
+    l1_enabled: true
+    l2_enabled: true
+    l3_enabled: true
 profiles:
   core_quality:
     require_checks: []

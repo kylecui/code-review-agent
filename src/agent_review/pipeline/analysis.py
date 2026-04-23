@@ -10,18 +10,29 @@ from sqlalchemy import select
 
 from agent_review.classifier.classifier import Classifier
 from agent_review.collectors.base import AbstractCollector, CollectorContext
+from agent_review.collectors.codeql import CodeQLCollector
+from agent_review.collectors.cppcheck import CppcheckCollector
+from agent_review.collectors.eslint_security import EslintSecurityCollector
 from agent_review.collectors.github_ci import GitHubCICollector
+from agent_review.collectors.gitleaks import GitleaksCollector
+from agent_review.collectors.golangci_lint import GolangciLintCollector
+from agent_review.collectors.luacheck import LuacheckCollector
 from agent_review.collectors.registry import CollectorRegistry
+from agent_review.collectors.roslyn import RoslynCollector
 from agent_review.collectors.secrets import SecretsCollector
 from agent_review.collectors.semgrep import SemgrepCollector
 from agent_review.collectors.sonar import SonarCollector
+from agent_review.collectors.spotbugs import SpotBugsCollector
 from agent_review.crypto import decrypt_value
 from agent_review.gate import GateController, PolicyLoader
 from agent_review.models import Finding
 from agent_review.models.app_config import AppConfig
 from agent_review.models.user_settings import UserSettings
 from agent_review.normalize import FindingsDeduplicator, FindingsNormalizer
+from agent_review.normalize.reachability import ReachabilityAnalyzer
+from agent_review.pipeline.engine_router import EngineRouter, detect_languages
 from agent_review.reasoning import LLMClient, PromptManager, Synthesizer
+from agent_review.schemas.policy import ScanTrackConfig
 
 if TYPE_CHECKING:
     import httpx
@@ -106,6 +117,10 @@ async def _resolve_api_keys(
     return api_keys
 
 
+def _load_engine_tiers(policy: PolicyConfig) -> ScanTrackConfig:
+    return policy.engine_tiers
+
+
 async def run_analysis(
     *,
     run: ReviewRun,
@@ -128,6 +143,8 @@ async def run_analysis(
     classifier = Classifier()
     classification = classifier.classify(changed_files, {})
     run.classification = classification.model_dump(mode="json")
+    if hasattr(run, "detected_languages"):
+        run.detected_languages = classification.detected_languages
     await db.commit()
     metrics.classification_ms = int((time.perf_counter() - stage_started) * 1000)
     if plog:
@@ -147,12 +164,48 @@ async def run_analysis(
     if plog:
         plog.info("COLLECTING", "Policy loaded", repo=run.repo)
 
-    collectors: dict[str, AbstractCollector] = {
+    all_collectors: dict[str, AbstractCollector] = {
         "semgrep": SemgrepCollector(settings, http_client),
         "sonar": SonarCollector(settings, http_client),
         "github_ci": GitHubCICollector(),
         "secrets": SecretsCollector(),
+        "gitleaks": GitleaksCollector(settings, http_client),
+        "spotbugs": SpotBugsCollector(settings, http_client),
+        "golangci_lint": GolangciLintCollector(settings, http_client),
+        "cppcheck": CppcheckCollector(settings, http_client),
+        "eslint_security": EslintSecurityCollector(settings, http_client),
+        "roslyn": RoslynCollector(settings, http_client),
+        "luacheck": LuacheckCollector(settings, http_client),
+        "codeql": CodeQLCollector(settings, http_client),
     }
+
+    detected_langs = set(classification.detected_languages)
+    scan_track = "baseline" if run.run_kind.value == "baseline" else "incremental"
+    engine_tiers = _load_engine_tiers(policy)
+    router = EngineRouter()
+    selection = router.select(scan_track, detected_langs, engine_tiers)
+
+    collectors: dict[str, AbstractCollector] = {
+        name: all_collectors[name] for name in selection.collectors if name in all_collectors
+    }
+
+    if plog:
+        plog.info(
+            "COLLECTING",
+            "Engine routing complete",
+            scan_track=scan_track,
+            selected_collectors=list(collectors.keys()),
+            rationale=selection.rationale,
+        )
+
+    if hasattr(run, "engine_selection"):
+        run.engine_selection = {
+            "collectors": selection.collectors,
+            "tier_breakdown": selection.tier_breakdown,
+            "rationale": selection.rationale,
+        }
+        await db.commit()
+
     ctx = CollectorContext(
         repo=run.repo,
         head_sha=run.head_sha,
@@ -199,6 +252,8 @@ async def run_analysis(
 
     normalizer = FindingsNormalizer()
     raw_findings = normalizer.normalize(collector_results)
+    reachability = ReachabilityAnalyzer()
+    raw_findings = reachability.analyze(raw_findings)
     deduplicator = FindingsDeduplicator()
     findings = deduplicator.deduplicate(raw_findings)
     for f in findings:

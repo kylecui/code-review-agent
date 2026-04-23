@@ -71,11 +71,19 @@ async def test_pipeline_pass_no_findings(async_engine, monkeypatch) -> None:
         _ = context
         return CollectorResult("semgrep", "success", [], 1)
 
+    async def _gitleaks_empty(self, context) -> CollectorResult:
+        _ = self
+        _ = context
+        return CollectorResult("gitleaks", "success", [], 1)
+
     monkeypatch.setattr(
         "agent_review.scm.github_auth.GitHubAppAuth.get_installation_token",
         _fake_token,
     )
     monkeypatch.setattr("agent_review.collectors.semgrep.SemgrepCollector.collect", _semgrep_empty)
+    monkeypatch.setattr(
+        "agent_review.collectors.gitleaks.GitleaksCollector.collect", _gitleaks_empty
+    )
 
     async with httpx.AsyncClient(timeout=30.0) as http_client:
         runner = PipelineRunner(_settings(), session_factory, http_client)
