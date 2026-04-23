@@ -1,5 +1,6 @@
 import re
 from collections import Counter
+from pathlib import Path
 
 from agent_review.schemas.classification import Classification
 
@@ -160,12 +161,15 @@ class Classifier:
         if has_workflow:
             profiles.append("workflow_security")
 
+        detected_languages = self._detect_languages(changed_files)
+
         return Classification(
             change_type=CHANGE_TYPE_MAP[dominant_category],
             domains=domains,
             risk_level=risk_level,
             profiles=profiles,
             file_categories=file_categories,
+            detected_languages=detected_languages,
         )
 
     @staticmethod
@@ -178,3 +182,15 @@ class Classifier:
             if category_counts.get(category, 0) == max_count:
                 return category
         return "general"
+
+    @staticmethod
+    def _detect_languages(changed_files: list[str]) -> list[str]:
+        from agent_review.pipeline.engine_router import EXTENSION_TO_LANGUAGE
+
+        languages: set[str] = set()
+        for file_path in changed_files:
+            suffix = Path(file_path).suffix.lower()
+            lang = EXTENSION_TO_LANGUAGE.get(suffix)
+            if lang:
+                languages.add(lang)
+        return sorted(languages)

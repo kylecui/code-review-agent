@@ -79,3 +79,36 @@ def test_change_type_derivations() -> None:
     assert api.change_type == "feature"
     assert tests.change_type == "test"
     assert general.change_type == "code"
+
+
+def test_detected_languages_from_file_extensions() -> None:
+    classifier = Classifier()
+
+    result = classifier.classify(
+        changed_files=["src/main.py", "lib/utils.go", "app.js", "handler.ts"],
+        pr_metadata={},
+    )
+
+    assert sorted(result.detected_languages) == ["go", "javascript", "python", "typescript"]
+
+
+def test_detected_languages_empty_for_non_code_files() -> None:
+    classifier = Classifier()
+
+    result = classifier.classify(
+        changed_files=["README.md", "docs/guide.rst", ".github/workflows/ci.yml"],
+        pr_metadata={},
+    )
+
+    assert result.detected_languages == []
+
+
+def test_detected_languages_deduplicates() -> None:
+    classifier = Classifier()
+
+    result = classifier.classify(
+        changed_files=["a.py", "b.py", "c.py"],
+        pr_metadata={},
+    )
+
+    assert result.detected_languages == ["python"]

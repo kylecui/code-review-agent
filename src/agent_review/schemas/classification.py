@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Classification(BaseModel):
@@ -7,3 +7,4 @@ class Classification(BaseModel):
     risk_level: str
     profiles: list[str]
     file_categories: dict[str, list[str]]
+    detected_languages: list[str] = Field(default_factory=list)
