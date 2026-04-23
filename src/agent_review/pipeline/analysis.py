@@ -19,6 +19,7 @@ from agent_review.crypto import decrypt_value
 from agent_review.gate import GateController, PolicyLoader
 from agent_review.models import Finding
 from agent_review.models.app_config import AppConfig
+from agent_review.models.user_settings import UserSettings
 from agent_review.normalize import FindingsDeduplicator, FindingsNormalizer
 from agent_review.reasoning import LLMClient, PromptManager, Synthesizer
 
@@ -50,6 +51,61 @@ class AnalysisResult:
     metrics: RunMetrics
 
 
+_LLM_KEY_NAMES: list[str] = [
+    "llm_openai_api_key",
+    "llm_gemini_api_key",
+    "llm_github_api_key",
+    "llm_anthropic_api_key",
+]
+
+
+async def _resolve_api_keys(
+    db: AsyncSession,
+    settings: Settings,
+    user_id: uuid.UUID | None = None,
+) -> dict[str, str]:
+    """Resolve LLM API keys: UserSettings (per-user) → AppConfig (global) → env."""
+    import json as _json
+
+    api_keys: dict[str, str] = {}
+    secret = settings.secret_key.get_secret_value()
+
+    # Layer 1: Per-user overrides (highest priority)
+    user_overrides: dict[str, str] = {}
+    if user_id is not None:
+        result = await db.execute(
+            select(UserSettings).where(
+                UserSettings.user_id == user_id,
+                UserSettings.key.in_(_LLM_KEY_NAMES),
+            )
+        )
+        for row in result.scalars().all():
+            decrypted = decrypt_value(_json.loads(row.value), secret)
+            if decrypted:
+                user_overrides[row.key] = decrypted
+
+    # Layer 2: Global AppConfig overrides
+    result = await db.execute(select(AppConfig).where(AppConfig.key.in_(_LLM_KEY_NAMES)))
+    global_overrides = {r.key: r for r in result.scalars().all()}
+
+    # Merge in priority order: user → global → env
+    for k in _LLM_KEY_NAMES:
+        if k in user_overrides:
+            api_keys[k] = user_overrides[k]
+            continue
+        override = global_overrides.get(k)
+        if override is not None:
+            decrypted = decrypt_value(_json.loads(override.value), secret)
+            if decrypted:
+                api_keys[k] = decrypted
+                continue
+        env_val = getattr(settings, k, None)
+        if isinstance(env_val, SecretStr) and env_val.get_secret_value():
+            api_keys[k] = env_val.get_secret_value()
+
+    return api_keys
+
+
 async def run_analysis(
     *,
     run: ReviewRun,
@@ -60,6 +116,7 @@ async def run_analysis(
     changed_files: list[str],
     pr_labels: list[str],
     metrics: RunMetrics,
+    user_id: uuid.UUID | None = None,
     local_path: str | None = None,
     plog: PipelineLogger | None = None,
 ) -> AnalysisResult:
@@ -183,28 +240,7 @@ async def run_analysis(
     if plog:
         plog.stage_start("REASONING")
 
-    api_keys: dict[str, str] = {}
-    secret = settings.secret_key.get_secret_value()
-    key_names = [
-        "llm_openai_api_key",
-        "llm_gemini_api_key",
-        "llm_github_api_key",
-        "llm_anthropic_api_key",
-    ]
-    result = await db.execute(select(AppConfig).where(AppConfig.key.in_(key_names)))
-    overrides = {r.key: r for r in result.scalars().all()}
-    for k in key_names:
-        override = overrides.get(k)
-        if override is not None:
-            import json
-
-            decrypted = decrypt_value(json.loads(override.value), secret)
-            if decrypted:
-                api_keys[k] = decrypted
-                continue
-        env_val = getattr(settings, k, None)
-        if isinstance(env_val, SecretStr) and env_val.get_secret_value():
-            api_keys[k] = env_val.get_secret_value()
+    api_keys = await _resolve_api_keys(db, settings, user_id=user_id)
 
     llm_client = LLMClient(settings, api_keys=api_keys)
     prompt_manager = PromptManager(settings.prompts_dir)
