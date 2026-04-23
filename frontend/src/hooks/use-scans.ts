@@ -171,3 +171,29 @@ export function useExportReport() {
     },
   })
 }
+
+export interface LogEntry {
+  ts: string
+  stage: string
+  level: string
+  msg: string
+  details?: Record<string, unknown>
+}
+
+export function useScanLogs(scanId: string | null, level?: string) {
+  return useQuery({
+    queryKey: ['scan-logs', scanId, level],
+    enabled: Boolean(scanId),
+    queryFn: async (): Promise<LogEntry[]> => {
+      if (!scanId) return []
+      const params = new URLSearchParams()
+      if (level) params.set('level', level)
+      const qs = params.toString()
+      const response = await fetch(`/api/admin/scans/${scanId}/logs${qs ? `?${qs}` : ''}`, {
+        credentials: 'include',
+      })
+      if (!response.ok) throw new Error('Failed to load logs')
+      return response.json()
+    },
+  })
+}

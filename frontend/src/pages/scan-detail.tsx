@@ -1,7 +1,8 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useCancelScan, useDeleteScan, useExportReport, useScanDetail } from '@/hooks/use-scans'
+import { useCancelScan, useDeleteScan, useExportReport, useScanDetail, useScanLogs } from '@/hooks/use-scans'
+import type { LogEntry } from '@/hooks/use-scans'
 import type { FindingRead } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -90,6 +91,81 @@ function FindingCard({ finding, repo, headSha }: FindingCardProps) {
       </CardContent>
     </Card>
   )
+}
+
+const LOG_LEVELS = ['ALL', 'INFO', 'WARN', 'ERROR', 'DEBUG'] as const
+
+function logLevelClass(level: string) {
+  if (level === 'ERROR') return 'text-red-600'
+  if (level === 'WARN') return 'text-amber-600'
+  if (level === 'DEBUG') return 'text-zinc-400'
+  return 'text-zinc-700'
+}
+
+function LogViewer({ scanId }: { scanId: string }) {
+  const [levelFilter, setLevelFilter] = useState<string>('ALL')
+  const logsQuery = useScanLogs(scanId, levelFilter === 'ALL' ? undefined : levelFilter)
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Pipeline Logs</CardTitle>
+          <div className="flex gap-1">
+            {LOG_LEVELS.map((lvl) => (
+              <button
+                key={lvl}
+                type="button"
+                className={cn(
+                  'rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                  levelFilter === lvl ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
+                )}
+                onClick={() => setLevelFilter(lvl)}
+              >
+                {lvl}
+              </button>
+            ))}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {logsQuery.isLoading ? (
+          <p className="text-sm text-zinc-500">Loading logs…</p>
+        ) : logsQuery.isError ? (
+          <p className="text-sm text-red-600">Failed to load logs.</p>
+        ) : !logsQuery.data || logsQuery.data.length === 0 ? (
+          <p className="text-sm text-zinc-500">No logs available for this scan.</p>
+        ) : (
+          <div className="max-h-96 overflow-auto rounded-md bg-zinc-950 p-3 font-mono text-xs">
+            {logsQuery.data.map((entry: LogEntry, idx: number) => (
+              <div key={idx} className="flex gap-2 leading-relaxed">
+                <span className="shrink-0 text-zinc-500">{formatLogTime(entry.ts)}</span>
+                <span className={cn('shrink-0 w-12', logLevelClass(entry.level))}>[{entry.level}]</span>
+                <span className="shrink-0 text-blue-400">{entry.stage}</span>
+                <span className="text-zinc-300">{entry.msg}</span>
+                {entry.details ? (
+                  <span className="text-zinc-500">{JSON.stringify(entry.details)}</span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function formatLogTime(iso: string) {
+  try {
+    const d = new Date(iso)
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mm = String(d.getMinutes()).padStart(2, '0')
+    const ss = String(d.getSeconds()).padStart(2, '0')
+    const ms = String(d.getMilliseconds()).padStart(3, '0')
+    return `${hh}:${mm}:${ss}.${ms}`
+  } catch {
+    return iso
+  }
 }
 
 export function ScanDetailPage({ scanId, isSuperuser, onBack }: ScanDetailPageProps) {
@@ -248,6 +324,8 @@ export function ScanDetailPage({ scanId, isSuperuser, onBack }: ScanDetailPagePr
           {advisory.length === 0 ? <p className="text-sm text-zinc-500">No advisory findings.</p> : null}
         </div>
       </section>
+
+      <LogViewer scanId={scan.id} />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -35,6 +35,7 @@ class ReviewRunRead(BaseModel):
     decision: dict[str, object] | None
     metrics: dict[str, object] | None
     error: str | None
+    run_logs: list[dict[str, Any]] | None = None
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None

@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from agent_review.config import Settings
     from agent_review.models import ReviewRun
     from agent_review.observability import RunMetrics
+    from agent_review.observability.pipeline_logger import PipelineLogger
     from agent_review.reasoning.synthesizer import SynthesisResult
     from agent_review.schemas.classification import Classification
     from agent_review.schemas.decision import ReviewDecision
@@ -60,21 +61,34 @@ async def run_analysis(
     pr_labels: list[str],
     metrics: RunMetrics,
     local_path: str | None = None,
+    plog: PipelineLogger | None = None,
 ) -> AnalysisResult:
     stage_started = time.perf_counter()
     await _do_transition(db, run, "CLASSIFYING")
+    if plog:
+        plog.stage_start("CLASSIFYING")
 
     classifier = Classifier()
     classification = classifier.classify(changed_files, {})
     run.classification = classification.model_dump(mode="json")
     await db.commit()
     metrics.classification_ms = int((time.perf_counter() - stage_started) * 1000)
+    if plog:
+        plog.stage_end(
+            "CLASSIFYING",
+            change_type=classification.change_type,
+            risk_level=classification.risk_level,
+        )
 
     stage_started = time.perf_counter()
     await _do_transition(db, run, "COLLECTING")
+    if plog:
+        plog.stage_start("COLLECTING")
 
     policy_loader = PolicyLoader(settings.policy_dir)
     policy = policy_loader.load(run.repo)
+    if plog:
+        plog.info("COLLECTING", "Policy loaded", repo=run.repo)
 
     collectors: dict[str, AbstractCollector] = {
         "semgrep": SemgrepCollector(settings, http_client),
@@ -106,9 +120,25 @@ async def run_analysis(
         }
         for result in collector_results
     }
+    if plog:
+        for cr in collector_results:
+            plog.info(
+                "COLLECTING",
+                f"Collector {cr.collector_name}: {cr.status}",
+                collector=cr.collector_name,
+                status=cr.status,
+                finding_count=len(cr.raw_findings),
+                duration_ms=cr.duration_ms,
+                error=cr.error,
+            )
+        plog.stage_end(
+            "COLLECTING", total_raw_findings=sum(len(cr.raw_findings) for cr in collector_results)
+        )
 
     stage_started = time.perf_counter()
     await _do_transition(db, run, "NORMALIZING")
+    if plog:
+        plog.stage_start("NORMALIZING")
 
     normalizer = FindingsNormalizer()
     raw_findings = normalizer.normalize(collector_results)
@@ -141,9 +171,17 @@ async def run_analysis(
     await db.commit()
     metrics.normalization_ms = int((time.perf_counter() - stage_started) * 1000)
     metrics.finding_count = len(findings)
+    if plog:
+        plog.stage_end(
+            "NORMALIZING",
+            raw_count=len(raw_findings),
+            deduped_count=len(findings),
+        )
 
     stage_started = time.perf_counter()
     await _do_transition(db, run, "REASONING")
+    if plog:
+        plog.stage_start("REASONING")
 
     api_keys: dict[str, str] = {}
     secret = settings.secret_key.get_secret_value()
@@ -175,9 +213,18 @@ async def run_analysis(
     metrics.reasoning_ms = int((time.perf_counter() - stage_started) * 1000)
     metrics.llm_cost_cents = synthesis.cost_cents
     metrics.is_degraded = synthesis.is_degraded
+    if plog:
+        plog.stage_end(
+            "REASONING",
+            model_used=synthesis.model_used,
+            cost_cents=synthesis.cost_cents,
+            is_degraded=synthesis.is_degraded,
+        )
 
     stage_started = time.perf_counter()
     await _do_transition(db, run, "DECIDING")
+    if plog:
+        plog.stage_start("DECIDING")
 
     gate = GateController()
     decision = gate.evaluate(
@@ -192,6 +239,14 @@ async def run_analysis(
     await db.commit()
     metrics.gate_ms = int((time.perf_counter() - stage_started) * 1000)
     metrics.verdict = decision.verdict.value
+    if plog:
+        plog.stage_end(
+            "DECIDING",
+            verdict=decision.verdict.value,
+            confidence=decision.confidence,
+            blocking_count=len(decision.blocking_findings),
+            advisory_count=len(decision.advisory_findings),
+        )
 
     return AnalysisResult(
         classification=classification,

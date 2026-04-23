@@ -263,6 +263,31 @@ async def export_report(
     )
 
 
+@router.get("/{scan_id}/logs")
+async def get_scan_logs(
+    scan_id: uuid.UUID,
+    request: Request,
+    current_user: CurrentUser,
+    level: str | None = Query(default=None),
+) -> list[dict[str, Any]]:
+    _ = current_user
+    session_factory = request.app.state.session_factory
+
+    async with session_factory() as db:
+        scan = await db.get(ReviewRun, scan_id)
+
+    if scan is None:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    logs: list[dict[str, Any]] = scan.run_logs or []
+
+    if level:
+        upper = level.upper()
+        logs = [entry for entry in logs if entry.get("level") == upper]
+
+    return logs
+
+
 @router.post("/trigger", response_model=ReviewRunRead, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_scan(
     body: TriggerScanBody,

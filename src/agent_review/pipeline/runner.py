@@ -5,7 +5,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 from agent_review.models import ReviewRun, ReviewState
-from agent_review.observability import RunMetrics, get_logger
+from agent_review.observability import PipelineLogger, RunMetrics, get_logger
 from agent_review.pipeline.analysis import run_analysis
 from agent_review.reasoning import PromptManager
 from agent_review.scm.github_auth import GitHubAppAuth
@@ -34,6 +34,7 @@ class PipelineRunner:
 
     async def run(self, run_id: str) -> None:
         metrics = RunMetrics(run_id=run_id)
+        plog = PipelineLogger(run_id)
         started_total = time.perf_counter()
         run: ReviewRun | None = None
         try:
@@ -42,6 +43,8 @@ class PipelineRunner:
                 run = await db.get(ReviewRun, run_uuid)
                 if run is None or run.is_terminal:
                     return
+
+                plog.info("INIT", "PR pipeline started", repo=run.repo, pr_number=run.pr_number)
 
                 auth = GitHubAppAuth(
                     self._settings.github_app_id,
@@ -52,6 +55,9 @@ class PipelineRunner:
                 github = GitHubClient(self._http_client, auth, run.installation_id)
 
                 if await self._check_superseded(db, run):
+                    plog.warn("SUPERSEDED", "Run superseded before analysis")
+                    run.run_logs = plog.entries
+                    await db.commit()
                     return
 
                 pr_files = await github.get_pr_files(run.repo, run.pr_number)
@@ -64,8 +70,17 @@ class PipelineRunner:
                     for label in labels_obj
                     if isinstance(label, dict) and "name" in label
                 ]
+                plog.info(
+                    "INIT",
+                    "PR metadata fetched",
+                    changed_file_count=len(changed_files),
+                    label_count=len(pr_labels),
+                )
 
                 if await self._check_superseded(db, run):
+                    plog.warn("SUPERSEDED", "Run superseded before analysis")
+                    run.run_logs = plog.entries
+                    await db.commit()
                     return
 
                 result = await run_analysis(
@@ -77,12 +92,17 @@ class PipelineRunner:
                     changed_files=changed_files,
                     pr_labels=pr_labels,
                     metrics=metrics,
+                    plog=plog,
                 )
 
                 if await self._check_superseded(db, run):
+                    plog.warn("SUPERSEDED", "Run superseded after analysis")
+                    run.run_logs = plog.entries
+                    await db.commit()
                     return
 
                 stage_started = time.perf_counter()
+                plog.stage_start("PUBLISHING")
                 run.transition(ReviewState.PUBLISHING)
                 await db.commit()
 
@@ -95,6 +115,9 @@ class PipelineRunner:
                     external_id=str(run.id),
                     status="completed",
                     conclusion=projection.check_run_conclusion,
+                )
+                plog.info(
+                    "PUBLISHING", "Check run created", conclusion=projection.check_run_conclusion
                 )
 
                 prompt_manager = PromptManager(self._settings.prompts_dir)
@@ -116,17 +139,25 @@ class PipelineRunner:
                     event=projection.review_event,
                     body=summary_prompt,
                 )
+                plog.info("PUBLISHING", "PR review created", event=projection.review_event)
                 metrics.publishing_ms = int((time.perf_counter() - stage_started) * 1000)
+                plog.stage_end("PUBLISHING")
 
                 if await self._check_superseded(db, run):
+                    plog.warn("SUPERSEDED", "Run superseded after publishing")
+                    run.run_logs = plog.entries
+                    await db.commit()
                     return
 
                 metrics.total_ms = int((time.perf_counter() - started_total) * 1000)
                 run.transition(ReviewState.COMPLETED)
                 run.metrics = metrics.to_dict()
+                plog.info("COMPLETED", "Pipeline completed", total_ms=metrics.total_ms)
+                run.run_logs = plog.entries
                 await db.commit()
         except Exception as exc:
             logger.error("pipeline_failed", run_id=run_id, error=str(exc))
+            plog.error("FAILED", f"Pipeline failed: {exc}")
             if run is None:
                 return
             try:
@@ -138,6 +169,7 @@ class PipelineRunner:
                     run_in_db.transition(ReviewState.FAILED)
                     run_in_db.error = str(exc)[:1000]
                     run_in_db.metrics = metrics.to_dict()
+                    run_in_db.run_logs = plog.entries
                     await db.commit()
             except Exception:
                 pass
