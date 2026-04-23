@@ -58,6 +58,7 @@ async def test_create_scan_returns_202(tmp_path, monkeypatch) -> None:
 
 async def test_create_scan_missing_installation_id_returns_400(tmp_path, monkeypatch) -> None:
     import agent_review.api.scan as scan_module
+    from agent_review.scm.github_auth import GitHubAppAuth
 
     async def _fake_resolve_head_sha(_github, _repo, _ref, _branch):
         return "a" * 40
@@ -65,8 +66,12 @@ async def test_create_scan_missing_installation_id_returns_400(tmp_path, monkeyp
     async def _fake_run_baseline(_request, _run_id):
         pass
 
+    async def _fake_discover(_self, _repo, _http_client):
+        raise ValueError("GitHub App is not installed on repository 'owner/repo'")
+
     monkeypatch.setattr(scan_module, "_resolve_head_sha", _fake_resolve_head_sha)
     monkeypatch.setattr(scan_module, "_run_baseline", _fake_run_baseline)
+    monkeypatch.setattr(GitHubAppAuth, "discover_installation_id", _fake_discover)
 
     db_path = tmp_path / "scan_400.db"
     app = create_app(

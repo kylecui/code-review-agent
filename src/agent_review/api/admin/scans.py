@@ -226,10 +226,6 @@ async def trigger_scan(
     _ = current_user
     if body.repo is None:
         raise HTTPException(status_code=422, detail="'repo' is required (owner/name)")
-    if body.installation_id is None:
-        raise HTTPException(
-            status_code=422, detail="'installation_id' is required for GitHub scans"
-        )
 
     settings = request.app.state.settings
     session_factory = request.app.state.session_factory
@@ -241,8 +237,16 @@ async def trigger_scan(
         settings.github_app_id,
         settings.github_private_key.get_secret_value(),
     )
+
+    installation_id = body.installation_id
     async with httpx.AsyncClient(timeout=30.0) as http_client:
-        github = GitHubClient(http_client, auth, body.installation_id)
+        if installation_id is None:
+            try:
+                installation_id = await auth.discover_installation_id(body.repo, http_client)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        github = GitHubClient(http_client, auth, installation_id)
         default_branch = await github.get_default_branch(body.repo)
         head_sha = await github.get_branch_sha(body.repo, default_branch)
 
@@ -252,7 +256,7 @@ async def trigger_scan(
         run_kind=RunKind.BASELINE,
         head_sha=head_sha,
         state=ReviewState.PENDING,
-        installation_id=body.installation_id,
+        installation_id=installation_id,
     )
 
     async with session_factory() as db:

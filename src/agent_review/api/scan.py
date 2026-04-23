@@ -105,12 +105,11 @@ async def create_scan(
 
     installation_id = body.installation_id
     if installation_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "installation_id is required for GitHub scans (or provide 'path' for local scan)"
-            ),
-        )
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as discover_client:
+                installation_id = await auth.discover_installation_id(body.repo, discover_client)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     async with httpx.AsyncClient(timeout=30.0) as http_client:
         github = GitHubClient(http_client, auth, installation_id)

@@ -165,15 +165,15 @@ function TriggerScanDialog() {
                 <p className="text-xs text-zinc-400">The full repository name, e.g. octocat/hello-world</p>
               </div>
               <div className="space-y-1">
-                <label className="text-sm font-medium text-zinc-700">Installation ID</label>
+                <label className="text-sm font-medium text-zinc-700">Installation ID <span className="font-normal text-zinc-400">(optional)</span></label>
                 <Input
                   value={installationId}
                   onChange={(event) => setInstallationId(event.target.value)}
-                  placeholder="123456"
+                  placeholder="Auto-discovered from repo"
                   type="number"
                 />
                 <p className="text-xs text-zinc-400">
-                  The GitHub App installation ID. Find it in your GitHub App settings under Installations.
+                  Leave blank to auto-discover. Only needed if auto-discovery fails.
                 </p>
               </div>
             </>

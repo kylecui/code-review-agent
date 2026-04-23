@@ -46,3 +46,19 @@ class GitHubAppAuth:
         expires_at = now + 3600
         self._token_cache[installation_id] = (token, expires_at)
         return token
+
+    async def discover_installation_id(self, repo: str, http_client: httpx.AsyncClient) -> int:
+        """Look up the installation ID for a repository using App JWT auth."""
+        jwt_token = self.generate_jwt()
+        response = await http_client.get(
+            f"https://api.github.com/repos/{repo}/installation",
+            headers={
+                "Authorization": f"Bearer {jwt_token}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        if response.status_code == 404:
+            raise ValueError(f"GitHub App is not installed on repository '{repo}'")
+        response.raise_for_status()
+        data = cast("dict[str, object]", response.json())
+        return cast("int", data["id"])
