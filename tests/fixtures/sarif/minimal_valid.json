@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "generic-tool",
+          "rules": [
+            {
+              "id": "GEN001",
+              "properties": {
+                "category": "quality.generic",
+                "precision": "high",
+                "tags": ["CWE-79"]
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "GEN001",
+          "ruleIndex": 0,
+          "level": "warning",
+          "message": {
+            "text": "Example generic finding"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/main.py"
+                },
+                "region": {
+                  "startLine": 8,
+                  "endLine": 9,
+                  "snippet": {
+                    "text": "print(user_input)"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

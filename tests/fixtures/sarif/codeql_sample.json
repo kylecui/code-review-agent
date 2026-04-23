@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "CodeQL",
+          "rules": []
+        },
+        "extensions": [
+          {
+            "name": "python-security-queries",
+            "rules": [
+              {
+                "id": "py/sql-injection",
+                "properties": {
+                  "category": "security.sast",
+                  "precision": "high",
+                  "tags": ["security", "CWE-89"]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "results": [
+        {
+          "ruleId": "py/sql-injection",
+          "level": "warning",
+          "message": {
+            "text": "Potential SQL injection"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/db.py"
+                },
+                "region": {
+                  "startLine": 21,
+                  "snippet": {
+                    "text": "query = f\"SELECT * FROM t WHERE id = {user_input}\""
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
