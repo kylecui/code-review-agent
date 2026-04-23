@@ -44,6 +44,8 @@ class Finding(Base):
     fix_recommendation: Mapped[str] = mapped_column(String, nullable=False)
     test_recommendation: Mapped[str | None] = mapped_column(String, nullable=True)
     fingerprint: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    fingerprint_v2: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    engine_tier: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     disposition: Mapped[FindingDisposition] = mapped_column(
         Enum(FindingDisposition),
         nullable=False,

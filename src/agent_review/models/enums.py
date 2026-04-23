@@ -59,3 +59,10 @@ class FindingDisposition(str, _Enum):
     NEW = "new"
     EXISTING = "existing"
     FIXED = "fixed"
+
+
+class GitProvider(str, _Enum):
+    GITHUB = "github"
+    GITLAB = "gitlab"
+    BITBUCKET = "bitbucket"
+    GENERIC = "generic"

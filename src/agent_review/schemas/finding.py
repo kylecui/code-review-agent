@@ -28,6 +28,8 @@ class FindingCreate(BaseModel):
     fix_recommendation: str
     test_recommendation: str | None = None
     fingerprint: str
+    fingerprint_v2: str | None = None
+    engine_tier: str | None = None
     disposition: FindingDisposition = FindingDisposition.NEW
 
 

@@ -5,6 +5,7 @@ from .enums import (
     FindingConfidence,
     FindingDisposition,
     FindingSeverity,
+    GitProvider,
     ReviewState,
     RunKind,
     TriggerEvent,
@@ -14,6 +15,8 @@ from .finding import Finding
 from .policy_store import PolicyStore
 from .review_run import InvalidTransition, ReviewRun
 from .user import User
+from .user_repository import UserRepository
+from .user_settings import UserSettings
 
 __all__ = [
     "AppConfig",
@@ -23,6 +26,7 @@ __all__ = [
     "FindingConfidence",
     "FindingDisposition",
     "FindingSeverity",
+    "GitProvider",
     "InvalidTransition",
     "PolicyStore",
     "ReviewRun",
@@ -30,5 +34,7 @@ __all__ = [
     "RunKind",
     "TriggerEvent",
     "User",
+    "UserRepository",
+    "UserSettings",
     "Verdict",
 ]

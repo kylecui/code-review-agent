@@ -86,6 +86,10 @@ class ReviewRun(Base):
     metrics: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     error: Mapped[str | None] = mapped_column(String, nullable=True)
     run_logs: Mapped[list[dict[str, object]] | None] = mapped_column(JSON, nullable=True)
+    detected_languages: Mapped[list[str] | None] = mapped_column(JSON, nullable=True, default=None)
+    engine_selection: Mapped[dict[str, object] | None] = mapped_column(
+        JSON, nullable=True, default=None
+    )
     created_at: Mapped[_DATETIME_TYPE] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
