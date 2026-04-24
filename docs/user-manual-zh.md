@@ -28,11 +28,17 @@
 
 ## 1.1 产品简介
 
-Agent Review 是一个**基于策略的自动化代码审查代理**。它接收 GitHub Pull Request 的 Webhook 事件，运行确定性的证据收集器（Semgrep SAST、SonarQube、GitHub CI 注解、密钥扫描），对发现结果进行归一化和去重，使用大语言模型（LLM）进行优先级排序和解释，根据 YAML 策略生成合并决策，并以 GitHub Check Run 和 PR Review 的形式发布结构化反馈。
+Agent Review 是一个**基于策略的自动化代码审查代理**。
+它接收 GitHub Pull Request 的 Webhook 事件。
+它运行确定性的证据收集器（Semgrep SAST、SonarQube、GitHub CI 注解、密钥扫描）。
+它对发现结果做归一化和去重。
+它使用大语言模型（LLM）进行优先级排序和解释。
+它根据 YAML 策略生成合并决策。
+它通过 GitHub Check Run 和 PR Review 发布结构化反馈。
 
-Agent Review 同时支持：
-- **全仓库基线扫描**：通过 GitHub API 扫描整个仓库，建立代码质量基线
-- **本地独立扫描**：直接扫描任意本地目录，无需 GitHub 账号
+Agent Review 还支持两种补充模式：
+- **全仓库基线扫描**：通过 GitHub API 扫描整个仓库，用于建立代码质量基线
+- **本地独立扫描**：直接扫描任意本地目录，不依赖 GitHub 账号
 
 ## 1.2 核心特性
 
@@ -51,7 +57,7 @@ Agent Review 同时支持：
 
 ## 1.3 系统架构概览
 
-Agent Review 采用**七阶段流水线**设计处理每次代码审查：
+Agent Review 使用**七阶段流水线**处理每次代码审查：
 
 ```
 SCM Event (PR opened / synchronize / ready_for_review)
@@ -66,11 +72,11 @@ SCM Event (PR opened / synchronize / ready_for_review)
 
 ## 1.4 设计原则
 
-1. **推理与执行分离**：LLM 负责分类、优先级排序、解释和建议修复；CI/策略系统负责决定是否允许合并。
-2. **确定性工具优先**：优先使用 linter、类型检查器、测试框架、Semgrep、SonarQube 等确定性工具产生证据，LLM 在证据之上进行推理。
-3. **按 Profile 审查**：认证模块变更和文档变更不应使用相同的审查路径。
+1. **推理与执行分离**：LLM 负责分类、优先级排序、解释和修复建议。CI/策略系统负责是否允许合并。
+2. **确定性工具优先**：系统优先使用 linter、类型检查器、测试框架、Semgrep、SonarQube 生成证据。LLM 仅在证据之上推理。
+3. **按 Profile 审查**：认证模块变更与文档变更面临的风险不同，因此不应共用一条审查路径。
 4. **结构化发现**：每个发现都包含类别、严重性、置信度、证据、影响和修复建议。
-5. **低噪声输出**：产生大量弱评论的审查代理会被忽略，系统偏向高信号输出。
+5. **低噪声输出**：如果评论数量多但信息密度低，审查结果会被忽略。因此系统偏向高信号输出。
 
 ## 1.5 技术栈
 
@@ -121,7 +127,7 @@ SCM Event (PR opened / synchronize / ready_for_review)
 | SonarQube 实例 | 代码质量分析 |
 | ngrok | 本地测试 Webhook 时暴露端点 |
 
-> **仅需本地扫描？** 只需 Python 3.12+ 和 LLM API Key 即可。
+> **仅需本地扫描？** 你只需要 Python 3.12+ 和 LLM API Key。
 
 ## 2.2 Docker Compose 生产部署（推荐）
 
@@ -149,7 +155,7 @@ docker compose up -d
 | `db` | `postgres:16-alpine` | 5432 | PostgreSQL 数据库，带健康检查 |
 | `app` | 本地构建 | 8000 | Agent Review 应用（自动等待数据库就绪） |
 
-应用连接字符串：`postgresql+asyncpg://agent_review:agent_review_dev@db:5432/agent_review`
+默认应用连接字符串：`postgresql+asyncpg://agent_review:agent_review_dev@db:5432/agent_review`
 
 ### Docker 构建过程
 
@@ -194,10 +200,10 @@ make migrate
 make serve
 ```
 
-开发模式下：
+开发模式下有以下行为：
 - 默认使用 SQLite 数据库（`sqlite+aiosqlite:///./dev.db`）
-- Uvicorn 启动在 `http://localhost:8000`，支持热重载
-- 无需安装 Docker
+- Uvicorn 运行在 `http://localhost:8000`，支持热重载
+- 不需要 Docker
 
 ### 前端开发
 
@@ -225,7 +231,7 @@ npm run generate-api
 
 ## 2.4 Webhook 端点暴露
 
-GitHub 必须能通过 HTTPS 访问你的 Webhook URL `https://your-server.example.com/webhooks/github`。
+GitHub 需要通过 HTTPS 访问你的 Webhook URL `https://your-server.example.com/webhooks/github`。
 
 ### 方案一：ngrok（快速测试）
 
@@ -269,7 +275,7 @@ server {
 
 ### LLM 成本估算
 
-使用 `gpt-4o-mini`（分类）+ `gpt-4o`（综合分析）时，每次审查约 **$0.01 - $0.10**，视 diff 大小而定。可通过 `AGENT_REVIEW_LLM_COST_BUDGET_PER_RUN_CENTS` 设置每次审查的费用上限。
+使用 `gpt-4o-mini`（分类）+ `gpt-4o`（综合分析）时，每次审查约 **$0.01 - $0.10**，具体取决于 diff 大小。你可以通过 `AGENT_REVIEW_LLM_COST_BUDGET_PER_RUN_CENTS` 设置单次审查费用上限。
 
 ## 2.6 健康检查
 
@@ -285,7 +291,7 @@ curl http://localhost:8000/ready
 # 响应：{"status":"ready"}
 ```
 
-两个端点都返回成功后，服务即就绪。
+两个端点都返回成功后，服务即处于就绪状态。
 
 ---
 
@@ -343,7 +349,8 @@ AGENT_REVIEW_GITHUB_WEBHOOK_SECRET=你生成的webhook-secret
 
 # 第四章：环境变量参考
 
-所有配置通过 `AGENT_REVIEW_` 前缀的环境变量设置。配置加载优先级：`.env` 文件 → 系统环境变量。
+所有配置都通过 `AGENT_REVIEW_` 前缀环境变量设置。
+配置加载优先级为：`.env` 文件 → 系统环境变量。
 
 ## 4.1 数据库
 
@@ -438,13 +445,14 @@ AGENT_REVIEW_GITHUB_WEBHOOK_SECRET=你生成的webhook-secret
 
 # 第五章：使用指南
 
-Agent Review 提供三种使用模式：自动 PR 审查、基线扫描和本地扫描。
+Agent Review 提供三种使用模式：自动 PR 审查、基线扫描、本地扫描。
 
 ## 5.1 自动 PR 审查
 
 ### 工作原理
 
-GitHub App 安装并且服务运行后，PR 会被自动审查。代理在以下事件触发：
+安装 GitHub App 且服务运行后，PR 会自动进入审查。
+代理在以下事件触发：
 
 | 事件 | 触发时机 |
 |------|---------|
@@ -460,18 +468,20 @@ GitHub App 安装并且服务运行后，PR 会被自动审查。代理在以下
 
 ### 审查输出
 
-代理产生两种 GitHub 反馈：
+代理会产生两种 GitHub 反馈：
 
 1. **Check Run**：在 PR 的 Checks 标签页显示通过/失败状态
 2. **PR Review**：包含结构化摘要和行内评论（最多 `MAX_INLINE_COMMENTS` 条）
 
 ### 取代机制
 
-当新提交推送到有正在进行审查的 PR 时，代理会**自动取代**该 PR 的所有活跃审查，并基于新的 HEAD 重新开始。这避免了过时审查阻塞合并，也防止在过时代码上浪费资源。
+当新提交推送到正在审查的 PR 时，代理会**自动取代**该 PR 的所有活跃审查，并基于新的 HEAD 重新开始。
+因此，过时审查不会阻塞合并，也不会继续消耗资源。
 
 ## 5.2 基线扫描（通过 GitHub API）
 
-基线扫描用于对整个仓库进行全量扫描，建立代码质量基线，无需等待 PR。
+基线扫描用于对整个仓库进行全量扫描。
+它的目的，是在不等待 PR 的情况下建立代码质量基线。
 
 ### 通过 API 触发
 
@@ -555,7 +565,7 @@ docker exec code-review-agent-app-1 \
 
 ## 5.3 本地扫描（无需 GitHub）
 
-本地扫描可以直接扫描任意本地目录，无需 GitHub 凭据。
+本地扫描可以直接扫描任意本地目录，不需要 GitHub 凭据。
 
 ```bash
 python -m agent_review scan-local \
@@ -591,7 +601,8 @@ python -m agent_review scan-local \
 
 # 第六章：策略配置
 
-策略是 Agent Review 的核心控制机制，通过 YAML 文件定义审查行为。
+策略是 Agent Review 的核心控制机制。
+系统通过 YAML 文件定义审查行为。
 
 ## 6.1 策略文件位置
 
@@ -600,7 +611,8 @@ python -m agent_review scan-local \
 | `policies/default.policy.yaml` | 默认策略，适用于所有仓库 |
 | `policies/{owner}/{repo}.yaml` | 按仓库覆盖策略 |
 
-代理优先查找仓库特定策略，找不到则使用默认策略。
+代理优先查找仓库特定策略。
+如果未命中，则使用默认策略。
 
 ## 6.2 完整策略结构
 
@@ -671,7 +683,7 @@ exceptions:
 
 ## 6.3 collectors 段：收集器配置
 
-每个收集器可配置三个属性：
+每个收集器可以配置三个属性：
 
 | 属性 | 说明 |
 |------|------|
@@ -689,7 +701,8 @@ exceptions:
 
 ## 6.4 profiles 段：审查 Profile
 
-Profile 定义了不同场景下的审查规则。分类器根据变更文件自动选择激活哪些 Profile：
+Profile 定义了不同场景下的审查规则。
+分类器会根据变更文件自动选择需要激活的 Profile：
 
 | Profile | 激活条件 |
 |---------|---------|
@@ -718,7 +731,7 @@ Profile 定义了不同场景下的审查规则。分类器根据变更文件自
 
 ## 6.5 阻断 vs. 建议分类
 
-一个发现被归类为**阻断项**，需满足以下**任一**条件：
+一个发现被归类为**阻断项**，只需满足以下**任一**条件：
 
 1. **基于严重性**：发现的严重性为 `HIGH` 或 `CRITICAL`
 2. **基于策略**：发现的类别匹配任何活跃 Profile 中 `blocking_categories` 的通配符模式
@@ -737,12 +750,14 @@ Profile 定义了不同场景下的审查规则。分类器根据变更文件自
 
 ## 6.7 紧急绕过
 
-为 PR 添加以下标签可跳过策略评估：
+为 PR 添加以下标签可以跳过策略评估：
 
 - `emergency-bypass`
 - `hotfix`
 
-代理仍会运行所有收集器并以**建议**形式发布发现（WARN 决策），但**不会阻止合并**。此机制适用于紧急生产修复。
+代理仍会运行所有收集器，并以**建议**形式发布发现（WARN 决策）。
+另一方面，它**不会阻止合并**。
+该机制适用于紧急生产修复。
 
 ## 6.8 按仓库覆盖策略
 
@@ -761,7 +776,8 @@ mkdir -p policies/kylecui
 
 # 第七章：管理后台
 
-Agent Review 内置管理仪表盘，提供用户管理、设置管理、策略编辑和扫描管理功能。
+Agent Review 内置管理仪表盘。
+它覆盖用户管理、设置管理、策略编辑和扫描管理。
 
 ## 7.1 首次设置
 
@@ -795,7 +811,8 @@ AGENT_REVIEW_OAUTH_REDIRECT_URI=https://your-server.example.com/api/auth/github/
 
 ### JWT 令牌
 
-认证使用 JWT（JSON Web Token），令牌过期时间由 `AGENT_REVIEW_ACCESS_TOKEN_EXPIRE_MINUTES` 控制（默认 60 分钟）。
+认证使用 JWT（JSON Web Token）。
+令牌过期时间由 `AGENT_REVIEW_ACCESS_TOKEN_EXPIRE_MINUTES` 控制（默认 60 分钟）。
 
 ## 7.3 用户管理
 
@@ -869,7 +886,8 @@ AGENT_REVIEW_OAUTH_REDIRECT_URI=https://your-server.example.com/api/auth/github/
 
 ### ETag 冲突检测
 
-策略编辑器使用 ETag 机制防止覆盖并发编辑。如果另一个管理员在你编辑期间修改了同一策略，保存时会收到冲突提示。
+策略编辑器使用 ETag 机制，避免并发编辑相互覆盖。
+如果另一个管理员在你编辑期间修改了同一策略，保存时会收到冲突提示。
 
 ---
 
@@ -970,7 +988,8 @@ AGENT_REVIEW_OAUTH_REDIRECT_URI=https://your-server.example.com/api/auth/github/
 
 ## 9.2 阶段二：文件分类
 
-确定性的文件模式启发式分类器，根据变更文件的路径和名称进行分类。
+系统使用确定性的文件模式启发式分类器。
+分类依据是变更文件的路径和名称。
 
 ### 分类输出
 
@@ -993,7 +1012,7 @@ AGENT_REVIEW_OAUTH_REDIRECT_URI=https://your-server.example.com/api/auth/github/
 
 ## 9.3 阶段三：证据收集
 
-四个收集器**并行运行**：
+四个收集器会**并行运行**：
 
 | 收集器 | 说明 | 模式 |
 |--------|------|------|
@@ -1004,7 +1023,8 @@ AGENT_REVIEW_OAUTH_REDIRECT_URI=https://your-server.example.com/api/auth/github/
 
 ### 收集器接口
 
-所有收集器继承自 `AbstractCollector`，必须实现 `collect(context) -> CollectorResult` 方法：
+所有收集器都继承自 `AbstractCollector`。
+每个收集器都必须实现 `collect(context) -> CollectorResult` 方法：
 
 ```python
 class AbstractCollector(ABC):
@@ -1046,11 +1066,12 @@ class AbstractCollector(ABC):
 
 ### 去重
 
-按 `fingerprint` 去重。当存在重复时，保留严重性更高的那个。
+系统按 `fingerprint` 去重。
+如果出现重复，保留严重性更高的记录。
 
 ## 9.5 阶段五：LLM 推理
 
-LLM 对归一化后的发现进行综合分析，产出：
+LLM 对归一化后的发现进行综合分析，输出包括：
 
 1. **优先级排序**：按实际影响排序（不仅看严重性标签）
 2. **关联分组**：将相关发现分组
@@ -1069,13 +1090,14 @@ LLM 对归一化后的发现进行综合分析，产出：
 
 ### 降级处理
 
-当以下情况发生时，自动降级为**确定性综合分析**（不使用 LLM）：
+当出现以下情况时，系统会自动降级为**确定性综合分析**（不使用 LLM）：
 
 - LLM 调用失败
 - 超出每次运行的费用预算（`COST_BUDGET_PER_RUN_CENTS`）
 - LLM 返回格式异常
 
-确定性综合分析按类别和严重性分组排序发现，不提供 LLM 解释。
+确定性综合分析会按类别和严重性分组排序发现。
+这种模式不提供 LLM 解释。
 
 ### 提示词模板
 
@@ -1086,7 +1108,7 @@ LLM 对归一化后的发现进行综合分析，产出：
 
 ## 9.6 阶段六：策略决策
 
-策略控制器根据活跃的 Profile 评估所有发现，生成最终决策：
+策略控制器会根据活跃 Profile 评估所有发现，并生成最终决策：
 
 1. 加载策略文件（仓库特定 > 默认）
 2. 对每个发现判断是否匹配 `blocking_categories` 或严重性为 HIGH/CRITICAL
@@ -1133,7 +1155,8 @@ docker compose logs -f db
 
 ### 本地开发
 
-日志输出到控制台。设置 `AGENT_REVIEW_LOG_FORMAT=console` 获取可读格式。
+日志默认输出到控制台。
+你可以设置 `AGENT_REVIEW_LOG_FORMAT=console` 以获取可读格式。
 
 ### 日志格式
 
@@ -1189,7 +1212,7 @@ uv run alembic downgrade -1
 
 ### 健康检查
 
-建议配置监控系统定期检查以下端点：
+建议在监控系统中定期检查以下端点：
 
 | 端点 | 说明 | 检查间隔 |
 |------|------|---------|
@@ -1725,7 +1748,9 @@ uv run pre-commit install
 
 ## 12.1 litellm 抽象层
 
-Agent Review 使用 [litellm](https://docs.litellm.ai/) 作为 LLM 抽象层。litellm 提供统一的 API 接口，支持 100+ LLM 服务商，切换服务商只需修改模型名称和 API Key。
+Agent Review 使用 [litellm](https://docs.litellm.ai/) 作为 LLM 抽象层。
+litellm 提供统一 API 接口，支持 100+ LLM 服务商。
+因此，切换服务商时通常只需要修改模型名称和 API Key。
 
 ## 12.2 配置方法
 
@@ -1786,7 +1811,7 @@ Azure、Vertex AI、Bedrock 等其他服务商请参考 [litellm 文档](https:/
 
 ## 12.3 双模型策略
 
-Agent Review 使用两个模型来平衡成本和质量：
+Agent Review 使用双模型策略来平衡成本和质量：
 
 | 用途 | 环境变量 | 推荐 | 说明 |
 |------|---------|------|------|
@@ -1805,13 +1830,15 @@ Agent Review 使用两个模型来平衡成本和质量：
 
 ## 12.5 降级策略
 
-当 LLM 不可用时，系统不会崩溃：
+当 LLM 不可用时，系统仍可继续运行：
 
 1. **主模型失败** → 自动尝试 `FALLBACK_MODEL`
 2. **备选模型也失败** → 降级为确定性综合分析
 3. **超出费用预算** → 降级为确定性综合分析
 
-确定性综合分析按类别和严重性对发现进行分组和排序，不提供 LLM 生成的解释，但仍然产出完整的审查报告。
+确定性综合分析会按类别和严重性对发现分组和排序。
+它不提供 LLM 解释。
+但它仍会产出完整审查报告。
 
 ---
 
@@ -2026,43 +2053,60 @@ make migrate    # 数据库迁移
 
 **Q: 只想使用本地扫描，需要配置 GitHub App 吗？**
 
-A: 不需要。本地扫描只需 Python 3.12+ 和 LLM API Key。设置 `AGENT_REVIEW_SEMGREP_MODE=cli` 并确保安装了 semgrep CLI 即可。
+A: 不需要。
+本地扫描只需要 Python 3.12+ 和 LLM API Key。
+你可以设置 `AGENT_REVIEW_SEMGREP_MODE=cli`，并确保已安装 semgrep CLI。
 
 **Q: 支持哪些 LLM 服务商？**
 
-A: 通过 litellm 支持 100+ 服务商，包括 OpenAI、Google Gemini、Anthropic、Azure OpenAI、AWS Bedrock、GitHub Models 等。详见 [litellm 文档](https://docs.litellm.ai/docs/providers)。
+A: 系统通过 litellm 支持 100+ 服务商。
+具体来说，包括 OpenAI、Google Gemini、Anthropic、Azure OpenAI、AWS Bedrock、GitHub Models 等。
+完整列表请参考 [litellm 文档](https://docs.litellm.ai/docs/providers)。
 
 **Q: LLM 调用失败会怎样？**
 
-A: 系统会尝试使用 `FALLBACK_MODEL`，如果也失败则降级为确定性综合分析（不使用 LLM 但仍输出完整报告）。
+A: 系统会先尝试 `FALLBACK_MODEL`。
+如果仍失败，就会降级为确定性综合分析。
+在降级模式下不使用 LLM，但仍输出完整报告。
 
 **Q: 如何降低 LLM 成本？**
 
-A: 使用轻量模型（如 gpt-4o-mini）进行分类，设置合理的 `COST_BUDGET_PER_RUN_CENTS`，降低 `MAX_DIFF_LINES` 跳过超大 PR。
+A: 你可以使用轻量模型（如 gpt-4o-mini）做分类。
+同时应当设置合理的 `COST_BUDGET_PER_RUN_CENTS`。
+另一方面，可以降低 `MAX_DIFF_LINES` 以跳过超大 PR。
 
 **Q: 如何添加新的代码分析工具？**
 
-A: 实现 `AbstractCollector` 接口并注册到 registry 中。参见第十一章「添加新收集器」。
+A: 需要实现 `AbstractCollector` 接口，并注册到 registry。
+具体步骤见第十一章「添加新收集器」。
 
 **Q: 紧急修复时如何跳过审查？**
 
-A: 为 PR 添加 `emergency-bypass` 或 `hotfix` 标签。审查仍会运行但不会阻止合并。
+A: 为 PR 添加 `emergency-bypass` 或 `hotfix` 标签。
+审查仍会运行，但不会阻止合并。
 
 **Q: 支持 GitLab 吗？**
 
-A: 当前版本仅支持 GitHub。GitLab 支持在设计规划中但尚未实现。
+A: 当前版本仅支持 GitHub。
+GitLab 支持已进入设计规划，但尚未实现。
 
 **Q: 如何迁移数据库从 SQLite 到 PostgreSQL？**
 
-A: 修改 `AGENT_REVIEW_DATABASE_URL` 为 PostgreSQL 连接字符串，运行 `make migrate`。注意：SQLite 中的数据不会自动迁移，需要手动导出导入。
+A: 需要把 `AGENT_REVIEW_DATABASE_URL` 改为 PostgreSQL 连接字符串，然后运行 `make migrate`。
+需要注意，SQLite 数据不会自动迁移。
+你应当手动导出并导入。
 
 **Q: 首次注册的用户一定是管理员吗？**
 
-A: 是的。系统中第一个注册的用户自动成为超级用户（管理员）。
+A: 是的。
+系统中的第一个注册用户会自动成为超级用户（管理员）。
 
 **Q: 运行时修改设置需要重启吗？**
 
-A: 不需要。通过管理后台修改的设置会持久化到数据库，新扫描会自动使用新设置。进行中的扫描不受影响。
+A: 不需要。
+通过管理后台修改的设置会持久化到数据库。
+新扫描会自动使用新设置。
+进行中的扫描不受影响。
 
 ## 附录 F：术语表
 

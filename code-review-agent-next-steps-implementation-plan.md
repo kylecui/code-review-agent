@@ -6,17 +6,17 @@ Move from concept documents to a real v1 deployment with the smallest useful sco
 
 ## Recommended strategy
 
-Start with **one platform only**.
+Use **one platform only** for v1.
 
 Choose:
 - GitHub first, or
 - GitLab first
 
-Do not build both in parallel for v1.
+Do not build both platforms in parallel.
 
 ## Recommended v1 scope
 
-Build only these capabilities first:
+Build only these capabilities:
 - PR/MR ingest
 - diff classification
 - lint / typecheck / tests / coverage ingestion
@@ -36,7 +36,7 @@ Delay these items:
 
 ## Control model
 
-Decide the rollout mode before implementation.
+Choose the rollout mode before implementation.
 
 ### Stage A: advisory mode
 - bot comments only
@@ -50,7 +50,7 @@ Decide the rollout mode before implementation.
 
 ## Minimum infrastructure
 
-A practical first deployment stack:
+Use this first deployment stack:
 - FastAPI service
 - Redis queue
 - one worker process
@@ -90,7 +90,7 @@ Wire in:
 - SonarQube
 - Semgrep
 
-These are the primary facts.
+Treat these as the primary facts.
 
 ### 4. Add normalization
 Convert every tool output into one canonical finding schema.
@@ -181,7 +181,7 @@ Create these first:
 
 ## Recommended real-world v1
 
-Safest first production shape:
+Use this first production shape:
 - GitHub first
 - Python service
 - FastAPI + Redis worker
@@ -215,4 +215,4 @@ The v1 system is successful if it:
 
 ## Recommended immediate next action
 
-Start by creating the service repository and the canonical schemas, then wire in GitHub or GitLab webhook ingestion before implementing any LLM prompt logic.
+Create the service repository and the canonical schemas first. Then wire in GitHub or GitLab webhook ingestion before implementing any LLM prompt logic.

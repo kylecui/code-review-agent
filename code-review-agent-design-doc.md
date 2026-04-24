@@ -6,13 +6,14 @@
 
 ## Purpose
 
-Build an agent that reviews code changes with three distinct responsibilities:
+Build an agent that reviews code changes with three responsibilities.
 
 - **Quality assurance**: enforce standards, architecture rules, and pre-merge expectations.
 - **Quality control**: detect concrete defects, maintainability regressions, and missing tests in a specific change.
 - **Safety/security**: detect vulnerabilities, unsafe workflows, and risky operational changes.
 
-The agent is not the source of truth for merge control. It is the synthesis layer on top of deterministic evidence.
+The agent is not the merge authority.
+It is a synthesis layer built on deterministic evidence.
 
 ## Non-goals
 
@@ -27,20 +28,22 @@ This system does **not**:
 ## Design principles
 
 ### 1. Separate reasoning from enforcement
-The LLM can classify, prioritize, explain, and propose fixes.
-The CI/policy system should decide whether a merge is allowed.
+The LLM classifies, prioritizes, explains, and proposes fixes.
+The CI/policy system decides whether a merge is allowed.
 
 ### 2. Use deterministic tools first
-Let linters, type checkers, tests, SonarQube, Semgrep, CodeQL, secrets scanning, and dependency/supply-chain scanners produce evidence first. The agent reasons over that evidence instead of pretending to be the scanner.
+Linters, type checkers, tests, SonarQube, Semgrep, CodeQL, secrets scanning, and dependency or supply-chain scanners produce evidence first.
+The agent reasons over this evidence.
+It does not replace these scanners.
 
 ### 3. Review by profile, not with one universal prompt
-An auth change and a docs change should not invoke the same review path.
+An auth change and a docs change require different review paths.
 
 ### 4. Emit structured findings
-Every finding should have category, severity, confidence, evidence, impact, and fix guidance.
+Every finding includes category, severity, confidence, evidence, impact, and fix guidance.
 
 ### 5. Bias toward low-noise outputs
-A code-review agent that produces many weak comments will be ignored.
+If the agent posts many weak comments, teams will ignore it.
 
 ## System architecture
 
@@ -98,7 +101,7 @@ Adapters for:
 - repo posture checks
 
 ### Findings normalizer
-Converts raw tool outputs into one canonical schema:
+Converts raw tool output into one canonical schema:
 - source tool
 - category
 - file/line
@@ -252,7 +255,7 @@ Output:
 
 ## Policy model
 
-Use a repository-level or org-level machine-readable file, for example:
+Use a machine-readable file at the repository or organization level, for example:
 
 ```yaml
 version: 1
@@ -283,9 +286,9 @@ exceptions:
 
 Recommended rule set:
 
-- **pass**: no blocking findings, required checks green
-- **warn**: non-blocking maintainability or low-confidence concerns
-- **request_changes**: medium/high-confidence findings that need author action
+- **pass**: no blocking findings and required checks are green
+- **warn**: non-blocking maintainability concerns or low-confidence concerns
+- **request_changes**: medium-confidence or high-confidence findings that require author action
 - **block**: deterministic gate failed or critical/high material finding
 - **escalate**: auth model, crypto, parser/sandbox, or workflow-permission changes
 
@@ -331,4 +334,8 @@ Use internal gold sets:
 
 ## Bottom line
 
-Build the system as a **policy-grounded review orchestrator**, not as a single prompt. Deterministic evidence should come first, policy should remain explicit, and the LLM should synthesize and communicate findings rather than act as the only source of truth.
+Build the system as a **policy-grounded review orchestrator**, not as a single prompt.
+Deterministic evidence comes first.
+Policy remains explicit.
+The LLM synthesizes and communicates findings.
+It is not the only source of truth.

@@ -2,7 +2,7 @@
 
 ## Objective
 
-Provide an implementation-grade specification for deploying the code review agent on GitHub and GitLab.
+Define an implementation-ready specification for deploying the code review agent on GitHub and GitLab.
 
 ## Repository layout
 
@@ -68,25 +68,25 @@ agent-review/
 ## Service boundaries
 
 ### `api`
-Receives webhooks and queues reviews.
+Receive webhooks and queue review jobs.
 
 ### `classifier`
-Maps changed files and metadata to a review profile.
+Map changed files and metadata to a review profile.
 
 ### `collectors`
-Runs or fetches outputs from scanners and CI jobs.
+Run scanners and CI jobs, or fetch their outputs.
 
 ### `normalize`
-Transforms tool-specific outputs into the canonical finding schema.
+Convert tool-specific outputs into the canonical finding schema.
 
 ### `reasoning`
-Uses the LLM after evidence is collected.
+Run LLM reasoning after evidence collection completes.
 
 ### `gate`
-Applies deterministic merge policy.
+Apply deterministic merge policy.
 
 ### `scm`
-Posts checks, reviews, notes, and summary comments.
+Publish checks, reviews, notes, and summary comments.
 
 ## Minimal APIs
 
@@ -302,7 +302,7 @@ Use merge request approval policies to require approval for:
 
 ## SonarQube integration pattern
 
-Use SonarQube for PR decoration and as one deterministic input into the gate.
+Use SonarQube for PR decoration and as one deterministic gate input.
 
 Recommended gate:
 - fail if PR quality gate fails
@@ -362,7 +362,7 @@ limits:
 
 ## Review comment style guide
 
-Every comment should answer three things:
+Every comment should answer three questions:
 - what is wrong
 - why it matters
 - what to change
@@ -393,7 +393,7 @@ Delay:
 
 ## Recommended first milestone
 
-A practical first production target is:
+Use this first production target:
 - GitHub first
 - PR classification
 - lint/test/type/coverage
@@ -411,4 +411,4 @@ Then add:
 
 ## Bottom line
 
-Build this as a **review orchestrator** rather than a single model prompt: deterministic evidence in front, policy in the middle, LLM synthesis at the end, and SCM-native controls for merge enforcement.
+Build this as a **review orchestrator**. Put deterministic evidence first, policy in the middle, LLM synthesis at the end, and SCM-native controls on merge enforcement.

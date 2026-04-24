@@ -2,6 +2,8 @@
 
 ## Overview
 
+This guide explains how to set up and run Agent Review end to end.
+
 Agent Review is a policy-grounded code review bot for GitHub. It receives pull request webhooks, runs deterministic evidence collectors (Semgrep, SonarQube, GitHub CI annotations, secrets scanning), normalizes and deduplicates findings, uses an LLM to prioritize and explain them, evaluates a gate policy to produce a merge verdict, and posts structured feedback as GitHub Check Runs and PR Reviews.
 
 ## Prerequisites
@@ -34,7 +36,7 @@ Agent Review is a policy-grounded code review bot for GitHub. It receives pull r
 
 ## Step 2: Configure Environment
 
-Copy the example environment file and fill in your values:
+Copy the example environment file first, then set your values.
 
 ```bash
 cp .env.example .env
@@ -76,7 +78,7 @@ AGENT_REVIEW_LOG_LEVEL=INFO
 AGENT_REVIEW_LOG_FORMAT=json                             # "json" for production, "console" for dev
 ```
 
-You also need to set the LLM provider API key in the environment. The agent uses [litellm](https://docs.litellm.ai/docs/providers) as its LLM abstraction, so you can swap providers by changing the model strings and API key.
+Set your LLM provider API key in the environment as well. The agent uses [litellm](https://docs.litellm.ai/docs/providers) as its LLM abstraction. You can switch providers by changing model strings and API keys.
 
 **OpenAI:**
 
@@ -126,7 +128,7 @@ This starts two services:
 - **PostgreSQL 16** on port 5432
 - **Agent Review app** on port 8000
 
-The app connects to `postgresql+asyncpg://agent_review:agent_review_dev@db:5432/agent_review`. For a real production deployment, change the database password in `docker-compose.yml` and your `.env`.
+The app connects to `postgresql+asyncpg://agent_review:agent_review_dev@db:5432/agent_review`. For production, change the database password in `docker-compose.yml` and your `.env`.
 
 ### Option B: Local Development
 
@@ -143,7 +145,7 @@ make serve              # Start uvicorn on port 8000 with hot reload
 
 ### Exposing the Webhook Endpoint
 
-GitHub must be able to reach your webhook URL over HTTPS. Options:
+GitHub must reach your webhook URL over HTTPS. Common options:
 
 - **ngrok** (quickest for testing): `ngrok http 8000`, then use the generated HTTPS URL as your webhook URL in the GitHub App settings.
 - **Cloud VM** with a public IP behind a reverse proxy (nginx, Caddy).
@@ -161,11 +163,11 @@ curl http://localhost:8000/ready
 # {"status":"ready"}
 ```
 
-Once both return successfully, open a pull request on one of the installed repositories. The agent will post a Check Run and a PR Review within a few seconds.
+After both endpoints return successfully, open a pull request on one of the installed repositories. The agent should post a Check Run and a PR Review within a few seconds.
 
 ## Baseline Scanning (Full-Repository Scan)
 
-You can scan an entire repository without waiting for a PR. This is useful for establishing a baseline of existing code quality issues.
+Use baseline scanning when you need a full repository snapshot without waiting for a PR.
 
 ### Via API
 
@@ -192,7 +194,7 @@ python -m agent_review scan \
 
 ### Via CLI (Docker)
 
-If running in Docker Compose, use `docker exec` to run the CLI inside the container:
+If you run Docker Compose, use `docker exec` to run the CLI inside the container:
 
 ```bash
 # JSON report (machine-readable)
@@ -273,7 +275,7 @@ The detail page shows:
 
 ## How It Works
 
-The agent processes each PR through a seven-stage pipeline:
+Each PR goes through a seven-stage pipeline.
 
 ### 1. Webhook Reception
 
@@ -304,12 +306,12 @@ Raw findings from all collectors are converted into a canonical schema with unif
 
 ### 5. LLM Reasoning
 
-An LLM synthesizes the normalized findings: prioritizing by impact, grouping related issues, and generating human-readable explanations. The system uses a three-tier strategy based on finding count:
+An LLM synthesizes normalized findings. It prioritizes by impact, groups related issues, and writes readable explanations. The system uses a three-tier strategy based on finding count:
 - **Small** (few findings): processed in a single LLM call.
 - **Medium**: chunked for the LLM.
 - **Large**: summarized with sampling.
 
-If the LLM call fails or the per-run cost budget is exceeded, the agent falls back to a deterministic synthesis that groups and ranks findings without LLM assistance.
+If the LLM call fails or the per-run cost budget is exceeded, the agent falls back to deterministic synthesis that groups and ranks findings without LLM assistance.
 
 ### 6. Gate Decision
 
@@ -394,13 +396,13 @@ exceptions:
 ### Policy Sections
 
 - **collectors**: Defines each collector's failure behavior. `required` means the pipeline blocks if the collector fails. `degraded` means the review continues but notes the gap. `optional` means failures are silently ignored.
-- **profiles**: Each profile maps to a set of `blocking_categories` and `escalate_categories` using fnmatch glob patterns (e.g. `security.*` matches `security.xss`, `security.sqli`, etc.). The classifier selects which profiles apply based on the changed files.
+- **profiles**: Each profile maps to `blocking_categories` and `escalate_categories` using fnmatch glob patterns (e.g. `security.*` matches `security.xss`, `security.sqli`, etc.). The classifier selects applicable profiles based on changed files.
 - **limits**: Global caps on inline comments, summary findings, and diff size.
 - **exceptions**: PR labels that trigger emergency bypass.
 
 ### Per-Repository Overrides
 
-Create a file at `policies/{owner}/{repo}.yaml` to override the default policy for a specific repository. For example, `policies/kylecui/my-app.yaml` applies to the `kylecui/my-app` repo. The agent checks for a repo-specific policy first and falls back to `policies/default.policy.yaml`.
+Create `policies/{owner}/{repo}.yaml` to override the default policy for one repository. For example, `policies/kylecui/my-app.yaml` applies to `kylecui/my-app`. The agent checks for a repo-specific policy first, then falls back to `policies/default.policy.yaml`.
 
 ## Emergency Bypass
 
@@ -408,11 +410,11 @@ Add one of these labels to a PR to skip gate evaluation:
 - `emergency-bypass`
 - `hotfix`
 
-The agent still runs all collectors and posts findings as advisory comments (WARN verdict), but it will not block the merge. This is intended for urgent production fixes where speed is more important than a full review cycle.
+The agent still runs all collectors and posts findings as advisory comments (WARN verdict). It does not block merge. Use this path for urgent production fixes when speed is the priority.
 
 ## Supersession
 
-When a new commit is pushed to a PR that already has an in-progress review, the agent supersedes all active reviews for that PR and starts fresh on the new HEAD. This prevents stale reviews from blocking merges and avoids wasting resources on outdated code.
+When a new commit is pushed to a PR with an in-progress review, the agent supersedes active reviews for that PR and starts a new run on the latest HEAD. This avoids stale review results and avoids work on outdated code.
 
 ## Available Make Commands
 
@@ -429,7 +431,7 @@ make migrate    # Run Alembic database migrations (upgrade head)
 
 ### Access the Dashboard
 
-After deployment, open your browser and navigate to `https://your-server.example.com`. If no users exist, register the first account — it automatically becomes the admin.
+After deployment, open `https://your-server.example.com` in your browser. If no users exist, register the first account. That account becomes admin automatically.
 
 ### Manage Users
 
@@ -508,3 +510,5 @@ prompts/                # Jinja2 prompt templates (synthesize.j2, summarize.j2)
 policies/               # YAML policy files (default + per-repo overrides)
 tests/                  # Unit and integration tests (pytest, 165 tests)
 ```
+
+This guide covers setup, operation, and policy control for Agent Review. Use it as the default runbook for deployment and daily usage.
