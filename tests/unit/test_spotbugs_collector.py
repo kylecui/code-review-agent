@@ -191,7 +191,7 @@ async def test_tc_sb_006_settings_passthrough_to_cli(
         )
         result = await collector.collect(_spotbugs_context(tmp_path, ["Main.java"]))
 
-    cmd = cast(list[str], captured["cmd"])
+    cmd = cast("list[str]", captured["cmd"])
     assert result.status == "success"
     assert cmd[0] == "/custom/spotbugs"
     assert "-effort:min" in cmd

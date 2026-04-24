@@ -205,6 +205,6 @@ async def test_incremental_scan_skips_codeql(async_engine, monkeypatch) -> None:
 
     assert saved is not None
     assert saved.metrics is not None
-    collector_metrics = cast(dict[str, Any], saved.metrics["collector_metrics"])
+    collector_metrics = cast("dict[str, Any]", saved.metrics["collector_metrics"])
     assert "codeql" not in collector_metrics
     assert codeql_collect.await_count == 0

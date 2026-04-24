@@ -137,7 +137,7 @@ async def test_tc_lua_007_config_flag_passed(
 
     async def fake_create_subprocess_exec(*args: object, **kwargs: object) -> _StubProc:
         _ = kwargs
-        captured_cmd.extend(cast(tuple[str, ...], args))
+        captured_cmd.extend(cast("tuple[str, ...]", args))
         return _StubProc(returncode=0, stdout="")
 
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)

@@ -167,7 +167,7 @@ async def test_tc_esl_005_parses_output_and_maps_severity(
         result = await collector.collect(_context(tmp_path, ["src/a.js"]))
 
     assert result.status == "success"
-    severities = [cast(str, f["severity"]) for f in result.raw_findings]
+    severities = [cast("str", f["severity"]) for f in result.raw_findings]
     assert severities == ["HIGH", "MEDIUM", "LOW"]
 
 

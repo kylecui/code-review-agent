@@ -11,7 +11,6 @@ from agent_review.collectors.base import CollectorContext
 from agent_review.collectors.codeql import CodeQLCollector
 from agent_review.config import Settings
 
-
 _DEFAULT_LOCAL_PATH = object()
 
 

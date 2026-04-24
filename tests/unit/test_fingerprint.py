@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 # pyright: reportMissingTypeStubs=false
-
 import hashlib
 
 from agent_review.normalize.fingerprint import FingerprintGenerator
@@ -49,7 +48,7 @@ def test_tc_fp_002_compute_with_snippet_strips_single_line_comments() -> None:
 
 def test_tc_fp_003_compute_without_snippet_falls_back_to_line_based_fingerprint() -> None:
     generator = FingerprintGenerator()
-    expected = hashlib.sha256("R003|src/main.py|77".encode("utf-8")).hexdigest()
+    expected = hashlib.sha256(b"R003|src/main.py|77").hexdigest()
 
     fingerprint = generator.compute("R003", "src/main.py", "   ", 77)
 
@@ -115,7 +114,7 @@ def test_tc_fp_010_backward_compat_empty_snippet_uses_v010_formula() -> None:
     rule_id = "R010"
     file_path = "pkg/module.py"
     line = 101
-    expected = hashlib.sha256(f"{rule_id}|{file_path}|{line}".encode("utf-8")).hexdigest()
+    expected = hashlib.sha256(f"{rule_id}|{file_path}|{line}".encode()).hexdigest()
 
     fingerprint = generator.compute(rule_id, file_path, "", line)
 

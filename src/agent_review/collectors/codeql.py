@@ -111,7 +111,7 @@ class CodeQLCollector(AbstractCollector):
                 _, create_stderr = await asyncio.wait_for(
                     create_proc.communicate(), timeout=float(codeql_timeout)
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 create_proc.kill()
                 _ = await create_proc.communicate()
                 return CollectorResult(
@@ -147,7 +147,7 @@ class CodeQLCollector(AbstractCollector):
                 _, analyze_stderr = await asyncio.wait_for(
                     analyze_proc.communicate(), timeout=float(codeql_timeout)
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 analyze_proc.kill()
                 _ = await analyze_proc.communicate()
                 return CollectorResult(

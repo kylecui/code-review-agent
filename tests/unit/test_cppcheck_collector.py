@@ -189,7 +189,7 @@ async def test_tc_cpp_006_settings_passthrough_to_cli(
         )
         result = await collector.collect(_cpp_context(tmp_path, ["main.cxx"]))
 
-    cmd = cast(list[str], captured["cmd"])
+    cmd = cast("list[str]", captured["cmd"])
     assert result.status == "success"
     assert "--enable=warning" in cmd
     assert "--suppress=a" in cmd

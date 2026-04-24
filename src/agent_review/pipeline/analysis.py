@@ -30,7 +30,7 @@ from agent_review.models.app_config import AppConfig
 from agent_review.models.user_settings import UserSettings
 from agent_review.normalize import FindingsDeduplicator, FindingsNormalizer
 from agent_review.normalize.reachability import ReachabilityAnalyzer
-from agent_review.pipeline.engine_router import EngineRouter, detect_languages
+from agent_review.pipeline.engine_router import EngineRouter
 from agent_review.reasoning import LLMClient, PromptManager, Synthesizer
 from agent_review.schemas.policy import ScanTrackConfig
 
