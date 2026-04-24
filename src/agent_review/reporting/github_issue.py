@@ -81,9 +81,7 @@ async def publish_github_issue(
     installation_id: int,
     config_path: str | None = None,
 ) -> str:
-    settings = (
-        Settings(_env_file=config_path) if config_path else Settings()  # type: ignore[call-arg]
-    )
+    settings = Settings(_env_file=config_path) if config_path else Settings()
 
     auth = GitHubAppAuth(
         settings.github_app_id,

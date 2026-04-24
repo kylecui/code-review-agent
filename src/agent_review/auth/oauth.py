@@ -28,10 +28,10 @@ async def exchange_code_for_token(client_id: str, client_secret: str, code: str)
         )
         response.raise_for_status()
         data = response.json()
-        access_token = data.get("access_token", "")
-        if not access_token:
+        raw_token = data.get("access_token", "")
+        if not raw_token:
             raise ValueError("Missing GitHub access_token")
-        return access_token
+        return str(raw_token)
 
 
 async def fetch_github_user(access_token: str) -> dict[str, object]:

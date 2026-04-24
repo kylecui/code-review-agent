@@ -49,9 +49,7 @@ async def _run_scan(
     ref: str | None,
     config_path: str | None,
 ) -> AnalysisResult:
-    settings = (
-        Settings(_env_file=config_path) if config_path else Settings()  # type: ignore[call-arg]
-    )
+    settings = Settings(_env_file=config_path) if config_path else Settings()
 
     engine = create_engine(settings)
     session_factory = create_session_factory(engine)
@@ -108,9 +106,7 @@ async def _run_local_scan(
     if not local_path.is_dir():
         raise RuntimeError(f"Path does not exist or is not a directory: {path}")
 
-    settings = (
-        Settings(_env_file=config_path) if config_path else Settings()  # type: ignore[call-arg]
-    )
+    settings = Settings(_env_file=config_path) if config_path else Settings()
 
     engine = create_engine(settings)
     session_factory = create_session_factory(engine)

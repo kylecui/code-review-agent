@@ -46,6 +46,10 @@ class PipelineRunner:
 
                 plog.info("INIT", "PR pipeline started", repo=run.repo, pr_number=run.pr_number)
 
+                pr_number = run.pr_number
+                if pr_number is None:
+                    raise RuntimeError("PR pipeline requires pr_number")
+
                 auth = GitHubAppAuth(
                     self._settings.github_app_id,
                     self._settings.github_private_key.get_secret_value(),
@@ -60,10 +64,10 @@ class PipelineRunner:
                     await db.commit()
                     return
 
-                pr_files = await github.get_pr_files(run.repo, run.pr_number)
+                pr_files = await github.get_pr_files(run.repo, pr_number)
                 changed_files = [f["filename"] for f in pr_files if isinstance(f, dict)]
 
-                pr_data = await github.get_pr(run.repo, run.pr_number)
+                pr_data = await github.get_pr(run.repo, pr_number)
                 labels_obj = pr_data.get("labels", [])
                 pr_labels = [
                     label["name"]
@@ -134,7 +138,7 @@ class PipelineRunner:
                 )
                 await github.create_review(
                     repo=run.repo,
-                    pr_number=run.pr_number,
+                    pr_number=pr_number,
                     commit_id=run.head_sha,
                     event=projection.review_event,
                     body=summary_prompt,

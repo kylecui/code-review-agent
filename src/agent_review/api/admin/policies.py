@@ -5,7 +5,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated, Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import select

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import httpx
 import pytest
@@ -10,6 +10,9 @@ import pytest
 from agent_review.collectors.base import CollectorContext
 from agent_review.collectors.golangci_lint import GolangciLintCollector
 from agent_review.config import Settings
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _sarif_payload(path: str = "repo/pkg/main.go", level: str = "warning") -> dict[str, object]:

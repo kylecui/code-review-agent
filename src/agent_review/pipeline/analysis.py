@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import SecretStr
 from sqlalchemy import select
@@ -32,7 +32,6 @@ from agent_review.normalize import FindingsDeduplicator, FindingsNormalizer
 from agent_review.normalize.reachability import ReachabilityAnalyzer
 from agent_review.pipeline.engine_router import EngineRouter
 from agent_review.reasoning import LLMClient, PromptManager, Synthesizer
-from agent_review.schemas.policy import ScanTrackConfig
 
 if TYPE_CHECKING:
     import httpx
@@ -43,11 +42,11 @@ if TYPE_CHECKING:
     from agent_review.models import ReviewRun
     from agent_review.observability import RunMetrics
     from agent_review.observability.pipeline_logger import PipelineLogger
-    from agent_review.reasoning.synthesizer import SynthesisResult
+    from agent_review.reasoning.degraded import SynthesisResult
     from agent_review.schemas.classification import Classification
     from agent_review.schemas.decision import ReviewDecision
     from agent_review.schemas.finding import FindingCreate
-    from agent_review.schemas.policy import PolicyConfig
+    from agent_review.schemas.policy import PolicyConfig, ScanTrackConfig
     from agent_review.scm.github_client import GitHubClient
 
 
@@ -180,7 +179,9 @@ async def run_analysis(
     }
 
     detected_langs = set(classification.detected_languages)
-    scan_track = "baseline" if run.run_kind.value == "baseline" else "incremental"
+    scan_track: Literal["incremental", "baseline"] = (
+        "baseline" if run.run_kind.value == "baseline" else "incremental"
+    )
     engine_tiers = _load_engine_tiers(policy)
     router = EngineRouter()
     selection = router.select(scan_track, detected_langs, engine_tiers)

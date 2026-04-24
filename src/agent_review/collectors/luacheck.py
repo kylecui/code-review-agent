@@ -21,7 +21,8 @@ class LuacheckCollector(AbstractCollector):
     name = "luacheck"
 
     _LINE_RE: ClassVar[re.Pattern[str]] = re.compile(
-        r"^(?P<path>.+?):(?P<line>\d+):(?P<col>\d+)-(?P<end_col>\d+): \((?P<code>[A-Z]\d+)\) (?P<message>.+)$"
+        r"^(?P<path>.+?):(?P<line>\d+):(?P<col>\d+)-(?P<end_col>\d+):"
+        r" \((?P<code>[A-Z]\d+)\) (?P<message>.+)$"
     )
 
     def __init__(self, settings: Settings, http_client: httpx.AsyncClient):

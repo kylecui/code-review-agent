@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from agent_review.pipeline.engine_router import (
     EngineRouter,
-    EngineTierConfig,
-    ScanTrackConfig,
     detect_languages,
 )
+from agent_review.schemas.policy import EngineTierConfig, ScanTrackConfig
 
 
 def test_tc_er_001_incremental_java_selects_l1_only_for_language_specific() -> None:

@@ -44,7 +44,7 @@ class SecretsCollector(AbstractCollector):
                 if context.run_kind == "baseline":
                     if not str(alert.get("resolved_at", "")):
                         findings.append(self._parse_alert(alert))
-                elif self._is_relevant(alert, context.head_sha, context.base_sha):
+                elif self._is_relevant(alert, context.head_sha, context.base_sha or ""):
                     findings.append(self._parse_alert(alert))
 
             return CollectorResult(

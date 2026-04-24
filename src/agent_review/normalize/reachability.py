@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from agent_review.models.enums import FindingSeverity
 from agent_review.observability import get_logger
-from agent_review.schemas.finding import FindingCreate
+
+if TYPE_CHECKING:
+    from agent_review.schemas.finding import FindingCreate
 
 logger = get_logger(__name__)
 
@@ -19,7 +21,7 @@ class ReachabilityResult:
 
 
 class ReachabilityAnalyzer:
-    _SEVERITY_DEMOTION_MAP: dict[FindingSeverity, FindingSeverity] = {
+    _SEVERITY_DEMOTION_MAP: ClassVar[dict[FindingSeverity, FindingSeverity]] = {
         FindingSeverity.CRITICAL: FindingSeverity.HIGH,
         FindingSeverity.HIGH: FindingSeverity.MEDIUM,
         FindingSeverity.MEDIUM: FindingSeverity.LOW,

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import httpx
 import pytest
@@ -10,6 +9,9 @@ import pytest
 from agent_review.collectors.base import CollectorContext
 from agent_review.collectors.luacheck import LuacheckCollector
 from agent_review.config import Settings
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class _StubProc:

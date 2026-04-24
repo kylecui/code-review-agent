@@ -21,11 +21,11 @@ async def get_current_user(request: Request) -> User:
 
     session_factory = request.app.state.session_factory
     async with session_factory() as db:
-        user = await db.get(User, user_id)
+        row = await db.get(User, user_id)
 
-    if user is None or not user.is_active:
+    if not isinstance(row, User) or not row.is_active:
         raise HTTPException(status_code=401, detail="Invalid or inactive user")
-    return user
+    return row
 
 
 async def get_current_superuser(request: Request) -> User:

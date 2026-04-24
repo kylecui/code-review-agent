@@ -370,9 +370,7 @@ async def test_multi_engine_finding_dedup_across_collectors(async_engine, monkey
 
     def _normalize_spotbugs_with_matching_fingerprint(self, result):
         findings = self._normalize_sarif_based(result, "SpotBugs", "quality.static-analysis")
-        matching_fingerprint = hashlib.sha256(
-            b"semgrep|RULE-1|src/App.java|42"
-        ).hexdigest()
+        matching_fingerprint = hashlib.sha256(b"semgrep|RULE-1|src/App.java|42").hexdigest()
         return [
             finding.model_copy(update={"fingerprint": matching_fingerprint}) for finding in findings
         ]

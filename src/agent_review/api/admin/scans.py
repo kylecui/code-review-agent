@@ -14,6 +14,7 @@ from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
+    File,
     HTTPException,
     Query,
     Request,
@@ -352,7 +353,7 @@ async def upload_scan(
     request: Request,
     background_tasks: BackgroundTasks,
     current_user: CurrentSuperuser,
-    file: UploadFile = ...,
+    file: Annotated[UploadFile, File()],
 ) -> ReviewRunRead:
     _ = current_user
     settings = request.app.state.settings
